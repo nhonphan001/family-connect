@@ -54,6 +54,15 @@
     font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
     background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
   }
+  .chip-toggle {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .chip-toggle.active { background: #FFE3DA; color: #B5502F; font-weight: 600; }
+  .save-btn {
+    border: none; border-radius: 10px; padding: 8px 16px; color: #fff;
+    font-size: 13px; cursor: pointer; font-weight: 600;
+  }
   .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
   .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
   .msg-parent { align-self: flex-end; color: #fff; }
@@ -107,6 +116,22 @@
   </div>
 
   <div class="card" style="margin-top:16px">
+    <div class="card-title">🔒 Giới hạn & chặn ứng dụng</div>
+    <div class="muted" style="margin-bottom:10px">Giới hạn thời gian dùng máy mỗi ngày (phút)</div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap">
+      <input type="number" id="limitInput" class="msg-input" style="max-width:100px; flex:none" min="0" step="5" />
+      <span class="muted">phút / ngày</span>
+      <button class="save-btn" id="saveLimitBtn" style="background:#2F9E8F">Lưu</button>
+    </div>
+    <div class="muted" style="margin-bottom:8px">Bấm để chặn/bỏ chặn ứng dụng</div>
+    <div id="blockedAppChips"></div>
+    <div style="display:flex; gap:8px; margin-top:10px">
+      <input class="msg-input" id="customAppInput" placeholder="Tên gói khác, ví dụ: com.example.app" />
+      <button class="save-btn" id="addCustomAppBtn" style="background:#5B7280">Thêm</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <div class="card-title">💬 Nhắn tin</div>
     <div class="msg-list" id="msgList"></div>
     <div id="quickMsgs"></div>
@@ -132,10 +157,20 @@ const QUICK_MESSAGES = [
   "Nhớ nghỉ mắt một chút",
   "Tối nay nhà mình ăn gì con thích?",
 ];
+const PRESET_APPS = [
+  { name: "YouTube", pkg: "com.google.android.youtube" },
+  { name: "TikTok", pkg: "com.zhiliaoapp.musically" },
+  { name: "Facebook", pkg: "com.facebook.katana" },
+  { name: "Messenger", pkg: "com.facebook.orca" },
+  { name: "Instagram", pkg: "com.instagram.android" },
+  { name: "Zalo", pkg: "com.zing.zalo" },
+  { name: "Chrome", pkg: "com.android.chrome" },
+  { name: "CH Play", pkg: "com.android.vending" },
+];
 
 let activeId = CHILD_META[0].id;
-let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages } }
-CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [] });
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [] });
 
 function todayKey() {
   const d = new Date();
@@ -194,7 +229,8 @@ async function refreshChild(meta) {
     state[meta.id] = {
       dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
       usedToday, points: (data && data.rewards && data.rewards.points) || 0,
-      apps, alerts, messages
+      apps, alerts, messages,
+      blockedApps: (data && data.rules && data.rules.blockedApps) || []
     };
     render();
   } catch (e) {
@@ -222,6 +258,34 @@ async function awardPoints(amount) {
   catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
 }
 
+async function saveDailyLimit() {
+  const input = document.getElementById("limitInput");
+  const val = parseInt(input.value, 10);
+  if (isNaN(val) || val < 0) return;
+  state[activeId].dailyLimit = val;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/dailyLimitMinutes`, val); }
+  catch { showError("Không lưu được giới hạn giờ — kiểm tra kết nối Firebase."); }
+}
+
+async function toggleBlockedApp(pkg) {
+  const list = state[activeId].blockedApps.slice();
+  const idx = list.indexOf(pkg);
+  if (idx >= 0) list.splice(idx, 1); else list.push(pkg);
+  state[activeId].blockedApps = list;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/blockedApps`, list); }
+  catch { showError("Không lưu được danh sách chặn — kiểm tra kết nối Firebase."); }
+}
+
+function addCustomApp() {
+  const input = document.getElementById("customAppInput");
+  const pkg = input.value.trim();
+  if (!pkg) return;
+  input.value = "";
+  if (!state[activeId].blockedApps.includes(pkg)) toggleBlockedApp(pkg);
+}
+
 function render() {
   const meta = CHILD_META.find(c => c.id === activeId);
   const s = state[activeId];
@@ -247,6 +311,20 @@ function render() {
 
   // points
   document.getElementById("points").textContent = s.points;
+
+  // daily limit input (skip overwrite while user is typing)
+  const limitInput = document.getElementById("limitInput");
+  if (document.activeElement !== limitInput) limitInput.value = s.dailyLimit;
+
+  // blocked app chips
+  const customBlocked = s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p));
+  document.getElementById("blockedAppChips").innerHTML =
+    PRESET_APPS.map(a => `
+      <button class="chip-toggle ${s.blockedApps.includes(a.pkg) ? 'active' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${a.name}</button>
+    `).join("") +
+    customBlocked.map(p => `
+      <button class="chip-toggle active" onclick="toggleBlockedApp('${p}')">${p}</button>
+    `).join("");
 
   // apps
   document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => `
@@ -280,6 +358,9 @@ function quickSend(text) { document.getElementById("msgInput").value = text; sen
 
 document.getElementById("sendBtn").addEventListener("click", sendMessage);
 document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+document.getElementById("saveLimitBtn").addEventListener("click", saveDailyLimit);
+document.getElementById("addCustomAppBtn").addEventListener("click", addCustomApp);
+document.getElementById("customAppInput").addEventListener("keydown", e => { if (e.key === "Enter") addCustomApp(); });
 
 render();
 CHILD_META.forEach(refreshChild);
