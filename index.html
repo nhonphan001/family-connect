@@ -1,1 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Góc gia đình</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #EEF2F3;
+    color: #1C3D4E;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 26px; font-weight: 800; margin: 0; }
+  .sub { color: #5B7280; font-size: 14px; margin-top: 4px; }
+  .err {
+    margin-top: 12px; background: #FFF1EC; color: #B5502F;
+    padding: 10px 16px; border-radius: 12px; font-size: 14px;
+  }
+  .kids { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+  .kid-btn {
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border-radius: 16px; padding: 10px 16px;
+    border: 2px solid transparent; cursor: pointer; text-align: left;
+  }
+  .kid-btn.active { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .kid-name { font-weight: 600; font-size: 14px; }
+  .kid-grade { font-size: 12px; color: #8B9AA5; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+  .card { background: #fff; border-radius: 16px; padding: 20px; }
+  .card-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .big-num { font-size: 30px; font-weight: 800; }
+  .bar-bg { background: #EEF2F3; height: 8px; border-radius: 8px; margin-top: 8px; }
+  .bar-fill { height: 8px; border-radius: 8px; }
+  .muted { color: #8B9AA5; font-size: 12px; margin-top: 8px; }
+  .app-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
+  .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
+  .app-bar-fill { height: 14px; border-radius: 8px; }
+  .alert-item { border-left: 3px solid #FF7A59; padding: 4px 0 4px 12px; font-size: 14px; color: #5B7280; margin-bottom: 6px; }
+  .pill-btn {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #E9F6F3; color: #2F9E8F; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .quick-msg-btn {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
+  .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+  .msg-parent { align-self: flex-end; color: #fff; }
+  .msg-child { align-self: flex-start; background: #EEF2F3; }
+  .msg-input-row { display: flex; gap: 8px; }
+  .msg-input {
+    flex: 1; border: none; background: #EEF2F3; border-radius: 12px;
+    padding: 10px 12px; font-size: 14px; outline: none; color: #1C3D4E;
+  }
+  .send-btn {
+    border: none; border-radius: 12px; padding: 0 16px; color: #fff;
+    font-size: 16px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Góc gia đình</h1>
+  <div class="sub">Theo dõi và kết nối với các con khi dùng máy</div>
+  <div id="errBox"></div>
 
+  <div class="kids" id="kidSelector"></div>
+
+  <div class="grid two">
+    <div class="card">
+      <div class="card-title">⏱ Thời gian dùng máy hôm nay</div>
+      <div class="big-num" id="usedToday">0</div>
+      <div class="muted" id="limitLine"></div>
+      <div class="bar-bg"><div class="bar-fill" id="usageBar"></div></div>
+      <div class="muted" id="remainLine"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">⭐ Điểm thưởng</div>
+      <div class="big-num" id="points" style="color:#2F9E8F">0</div>
+      <div style="margin-top:10px">
+        <button class="pill-btn" onclick="awardPoints(10)">+10</button>
+        <button class="pill-btn" onclick="awardPoints(20)">+20</button>
+        <button class="pill-btn" onclick="awardPoints(50)">+50</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📱 Ứng dụng dùng nhiều nhất</div>
+    <div id="appList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px" id="alertsCard">
+    <div class="card-title">⚠️ Thông báo gần đây</div>
+    <div id="alertList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">💬 Nhắn tin</div>
+    <div class="msg-list" id="msgList"></div>
+    <div id="quickMsgs"></div>
+    <div class="msg-input-row">
+      <input class="msg-input" id="msgInput" placeholder="Nhắn điều gì đó tích cực..." />
+      <button class="send-btn" id="sendBtn">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ⚠️ Đổi 2 dòng dưới nếu bạn dùng project/tên khác
+const FIREBASE_URL = "https://family-connect-694a7-default-rtdb.asia-southeast1.firebasedatabase.app";
+const FAMILY_ID = "giadinh1";
+
+const CHILD_META = [
+  { id: "lop2", name: "Con lớp 2", grade: "Lớp 2", color: "#F2A93B", bg: "#FCEBCB" },
+  { id: "lop5", name: "Con lớp 5", grade: "Lớp 5", color: "#6C8EBF", bg: "#E1E9F5" },
+];
+const QUICK_MESSAGES = [
+  "Giỏi lắm, tiếp tục nha!",
+  "Còn 15 phút nữa hết giờ nhé",
+  "Nhớ nghỉ mắt một chút",
+  "Tối nay nhà mình ăn gì con thích?",
+];
+
+let activeId = CHILD_META[0].id;
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [] });
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+function showError(msg) {
+  document.getElementById("errBox").innerHTML = msg ? `<div class="err">${msg}</div>` : "";
+}
+
+async function fbGet(path) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json`);
+  if (!res.ok) throw new Error("GET failed " + res.status);
+  return res.json();
+}
+async function fbPut(path, value) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json`, {
+    method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
+  });
+  if (!res.ok) throw new Error("PUT failed " + res.status);
+  return res.json();
+}
+async function fbPost(path, value) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json`, {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
+  });
+  if (!res.ok) throw new Error("POST failed " + res.status);
+  return res.json();
+}
+
+async function refreshChild(meta) {
+  try {
+    const data = await fbGet(`families/${FAMILY_ID}/children/${meta.id}`);
+    showError(null);
+    const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
+    const apps = Object.entries(usageToday)
+      .map(([name, minutes]) => ({ name, minutes: Number(minutes) }))
+      .sort((a,b) => b.minutes - a.minutes).slice(0,6);
+    const usedToday = apps.reduce((s,a) => s + a.minutes, 0);
+    const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
+    const alerts = data && data.alerts
+      ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
+          label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy hôm nay"
+               : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
+               : a.type === "ADMIN_DISABLED" ? "Cảnh báo: quyền quản trị thiết bị bị tắt"
+               : "Cảnh báo",
+          time: new Date(a.timestamp).toLocaleTimeString("vi-VN", {hour:"2-digit", minute:"2-digit"})
+        }))
+      : [];
+    state[meta.id] = {
+      dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
+      usedToday, points: (data && data.rewards && data.rewards.points) || 0,
+      apps, alerts, messages
+    };
+    render();
+  } catch (e) {
+    showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById("msgInput");
+  const text = input.value.trim();
+  if (!text) return;
+  const msg = { from: "parent", text, timestamp: Date.now() };
+  state[activeId].messages.push(msg);
+  input.value = "";
+  render();
+  try { await fbPost(`families/${FAMILY_ID}/children/${activeId}/messages`, msg); }
+  catch { showError("Không gửi được tin nhắn — kiểm tra kết nối Firebase."); }
+}
+
+async function awardPoints(amount) {
+  const newTotal = state[activeId].points + amount;
+  state[activeId].points = newTotal;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rewards/points`, newTotal); }
+  catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
+}
+
+function render() {
+  const meta = CHILD_META.find(c => c.id === activeId);
+  const s = state[activeId];
+
+  // kid selector
+  document.getElementById("kidSelector").innerHTML = CHILD_META.map(c => `
+    <button class="kid-btn ${c.id===activeId?'active':''}"
+      style="border-color:${c.id===activeId ? c.color : 'transparent'}"
+      onclick="selectKid('${c.id}')">
+      <span class="avatar" style="background:${c.bg};color:${c.color}">${c.name[0]}</span>
+      <span><div class="kid-name">${c.name}</div><div class="kid-grade">${c.grade}</div></span>
+    </button>
+  `).join("");
+
+  // usage
+  document.getElementById("usedToday").textContent = s.usedToday;
+  document.getElementById("limitLine").textContent = `/ ${s.dailyLimit} phút`;
+  const pct = Math.min((s.usedToday / s.dailyLimit) * 100, 100);
+  const bar = document.getElementById("usageBar");
+  bar.style.width = pct + "%";
+  bar.style.background = pct > 90 ? "#FF7A59" : meta.color;
+  document.getElementById("remainLine").textContent = `Còn lại ${Math.max(s.dailyLimit - s.usedToday,0)} phút hôm nay`;
+
+  // points
+  document.getElementById("points").textContent = s.points;
+
+  // apps
+  document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => `
+    <div class="app-row">
+      <span class="app-name">${a.name}</span>
+      <div class="app-bar-bg"><div class="app-bar-fill" style="width:${Math.min(a.minutes*3,100)}%;background:${meta.color};opacity:${1 - i*0.12}"></div></div>
+      <span>${a.minutes}p</span>
+    </div>
+  `).join("") : `<div class="muted">Chưa có dữ liệu hôm nay</div>`;
+
+  // alerts
+  document.getElementById("alertsCard").style.display = s.alerts.length ? "block" : "none";
+  document.getElementById("alertList").innerHTML = s.alerts.map(a => `
+    <div class="alert-item">${a.label} · <span style="color:#B0BAC2">${a.time}</span></div>
+  `).join("");
+
+  // messages
+  document.getElementById("msgList").innerHTML = s.messages.map(m => `
+    <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
+      style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
+  `).join("");
+
+  // quick messages
+  document.getElementById("quickMsgs").innerHTML = QUICK_MESSAGES.map(q => `
+    <button class="quick-msg-btn" onclick="quickSend('${q.replace(/'/g,"\\'")}')">${q}</button>
+  `).join("");
+}
+
+function selectKid(id) { activeId = id; render(); }
+function quickSend(text) { document.getElementById("msgInput").value = text; sendMessage(); }
+
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+
+render();
+CHILD_META.forEach(refreshChild);
+setInterval(() => CHILD_META.forEach(refreshChild), 5000);
+</script>
+</body>
+</html>
