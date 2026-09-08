@@ -166,13 +166,19 @@ async function fbPost(path, value) {
   return res.json();
 }
 
+function prettyAppName(key) {
+  const pkg = key.replace(/_/g, ".");
+  const last = pkg.split(".").pop() || pkg;
+  return last.charAt(0).toUpperCase() + last.slice(1);
+}
+
 async function refreshChild(meta) {
   try {
     const data = await fbGet(`families/${FAMILY_ID}/children/${meta.id}`);
     showError(null);
     const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
     const apps = Object.entries(usageToday)
-      .map(([name, minutes]) => ({ name, minutes: Number(minutes) }))
+      .map(([key, minutes]) => ({ name: prettyAppName(key), minutes: Number(minutes) }))
       .sort((a,b) => b.minutes - a.minutes).slice(0,6);
     const usedToday = apps.reduce((s,a) => s + a.minutes, 0);
     const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
