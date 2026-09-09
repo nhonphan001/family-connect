@@ -133,6 +133,11 @@
     font-size: 12px; border: none; background: none; color: #8B9AA5;
     text-decoration: underline; cursor: pointer; margin-top: 4px; padding: 0;
   }
+  .id-type-btn {
+    border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
+    padding: 8px 16px; border-radius: 999px; cursor: pointer; font-weight: 600;
+  }
+  .id-type-btn.active { background: #2F9E8F; color: #fff; }
   .schedule-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
   .schedule-form select, .schedule-form input[type="time"] {
     border: none; background: #EEF2F3; border-radius: 10px; padding: 10px 12px;
@@ -163,7 +168,11 @@
   <div class="sub" style="text-align:center; margin-bottom:20px">Quản lý & kết nối với các con</div>
   <div class="auth-card">
     <div class="sub" id="authModeLabel" style="margin-bottom:14px">Đăng nhập</div>
-    <input class="auth-input" id="authEmail" type="email" placeholder="Email" />
+    <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px">
+      <button class="id-type-btn active" id="idTypePhoneBtn">Số điện thoại</button>
+      <button class="id-type-btn" id="idTypeEmailBtn">Email</button>
+    </div>
+    <input class="auth-input" id="authIdentifier" type="tel" placeholder="Số điện thoại (vd: 0912345678)" />
     <input class="auth-input" id="authPassword" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" />
     <div id="authError" class="err" style="display:none"></div>
     <button class="auth-submit" id="authSubmitBtn">Đăng nhập</button>
@@ -770,6 +779,7 @@ async function refreshAll() {
 
 // ---------- Đăng ký / Đăng nhập (dùng thẳng REST API của Firebase Auth, không cần SDK) ----------
 let authMode = "login";
+let idType = "phone"; // mặc định đăng ký/đăng nhập bằng số điện thoại
 
 function getSession() {
   try { return JSON.parse(localStorage.getItem("fc_session") || "null"); }
@@ -785,13 +795,50 @@ function randomFamilyCode() {
   return code;
 }
 
+// Số điện thoại không xác thực SMS thật (đỡ phải cấu hình reCAPTCHA/SMS trên
+// Firebase) — dùng số điện thoại làm "tên đăng nhập", quy đổi thành 1 email
+// giả nội bộ để tận dụng lại Firebase Email/Password Auth có sẵn.
+// Vẫn bắt buộc đúng cú pháp đầu số di động Việt Nam hiện hành.
+const VN_PHONE_REGEX = /^0(32|33|34|35|36|37|38|39|86|96|97|98|81|82|83|84|85|88|91|94|70|76|77|78|79|89|90|93|52|56|58|92|59|99|87|55)[0-9]{7}$/;
+
+function normalizeVNPhone(raw) {
+  let digits = raw.replace(/[^0-9]/g, "");
+  if (digits.length === 11 && digits.startsWith("84")) {
+    digits = "0" + digits.slice(2); // +84912345678 -> 0912345678
+  }
+  return digits;
+}
+function phoneToPseudoEmail(phone) {
+  const digits = normalizeVNPhone(phone);
+  return `sdt${digits}@sobengoan.app`;
+}
+
 function translateAuthError(code) {
-  if (code === "EMAIL_EXISTS") return "Email này đã đăng ký rồi — thử đăng nhập.";
+  if (code === "EMAIL_EXISTS") return idType === "phone" ? "Số điện thoại này đã đăng ký rồi — thử đăng nhập." : "Email này đã đăng ký rồi — thử đăng nhập.";
   if (code === "EMAIL_NOT_FOUND" || code === "INVALID_PASSWORD" || code === "INVALID_LOGIN_CREDENTIALS")
-    return "Sai email hoặc mật khẩu.";
+    return idType === "phone" ? "Sai số điện thoại hoặc mật khẩu." : "Sai email hoặc mật khẩu.";
   if (typeof code === "string" && code.startsWith("WEAK_PASSWORD")) return "Mật khẩu quá ngắn (tối thiểu 6 ký tự).";
   return "Có lỗi xảy ra, thử lại sau." + (code ? " (" + code + ")" : "");
 }
+
+function updateIdTypeUI() {
+  const phoneBtn = document.getElementById("idTypePhoneBtn");
+  const emailBtn = document.getElementById("idTypeEmailBtn");
+  const input = document.getElementById("authIdentifier");
+  phoneBtn.classList.toggle("active", idType === "phone");
+  emailBtn.classList.toggle("active", idType === "email");
+  if (idType === "phone") {
+    input.type = "tel";
+    input.placeholder = "Số điện thoại (vd: 0912345678)";
+  } else {
+    input.type = "email";
+    input.placeholder = "Email";
+  }
+  document.getElementById("authError").style.display = "none";
+}
+document.getElementById("idTypePhoneBtn").addEventListener("click", () => { idType = "phone"; updateIdTypeUI(); });
+document.getElementById("idTypeEmailBtn").addEventListener("click", () => { idType = "email"; updateIdTypeUI(); });
+updateIdTypeUI();
 
 document.getElementById("authToggleLink").addEventListener("click", (e) => {
   e.preventDefault();
@@ -807,13 +854,25 @@ document.getElementById("authSubmitBtn").addEventListener("click", handleAuthSub
 document.getElementById("authPassword").addEventListener("keydown", e => { if (e.key === "Enter") handleAuthSubmit(); });
 
 async function handleAuthSubmit() {
-  const email = document.getElementById("authEmail").value.trim();
+  const rawIdentifier = document.getElementById("authIdentifier").value.trim();
   const password = document.getElementById("authPassword").value;
   const errBox = document.getElementById("authError");
   errBox.style.display = "none";
 
-  if (!email || password.length < 6) {
-    errBox.textContent = "Nhập email hợp lệ và mật khẩu tối thiểu 6 ký tự.";
+  if (idType === "phone") {
+    const digits = normalizeVNPhone(rawIdentifier);
+    if (!VN_PHONE_REGEX.test(digits)) {
+      errBox.textContent = "Số điện thoại không đúng định dạng di động Việt Nam (vd: 0912345678).";
+      errBox.style.display = "block";
+      return;
+    }
+  } else if (!rawIdentifier.includes("@")) {
+    errBox.textContent = "Nhập email hợp lệ.";
+    errBox.style.display = "block";
+    return;
+  }
+  if (password.length < 6) {
+    errBox.textContent = "Mật khẩu tối thiểu 6 ký tự.";
     errBox.style.display = "block";
     return;
   }
@@ -823,12 +882,13 @@ async function handleAuthSubmit() {
     return;
   }
 
+  const authEmail = idType === "phone" ? phoneToPseudoEmail(rawIdentifier) : rawIdentifier;
   const endpoint = authMode === "login" ? "signInWithPassword" : "signUp";
   try {
     const res = await fetch(`${AUTH_BASE}:${endpoint}?key=${FIREBASE_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true })
+      body: JSON.stringify({ email: authEmail, password, returnSecureToken: true })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -836,14 +896,14 @@ async function handleAuthSubmit() {
       errBox.style.display = "block";
       return;
     }
-    await onAuthSuccess(data.localId, email);
+    await onAuthSuccess(data.localId, idType === "phone" ? normalizeVNPhone(rawIdentifier) : rawIdentifier, idType);
   } catch (e) {
     errBox.textContent = "Lỗi kết nối, thử lại sau.";
     errBox.style.display = "block";
   }
 }
 
-async function onAuthSuccess(uid, email) {
+async function onAuthSuccess(uid, identifier, kind) {
   const errBox = document.getElementById("authError");
   let famId;
   try {
@@ -853,7 +913,8 @@ async function onAuthSuccess(uid, email) {
     } else {
       famId = randomFamilyCode();
       await fbPut(`users/${uid}/familyId`, famId);
-      await fbPut(`families/${famId}/meta`, { ownerEmail: email, createdAt: Date.now() });
+      const meta = kind === "phone" ? { ownerPhone: identifier, createdAt: Date.now() } : { ownerEmail: identifier, createdAt: Date.now() };
+      await fbPut(`families/${famId}/meta`, meta);
     }
   } catch (e) {
     errBox.textContent = "Đăng nhập thành công nhưng không lấy được Mã gia đình — thử tải lại trang.";
@@ -861,7 +922,7 @@ async function onAuthSuccess(uid, email) {
     return;
   }
   FAMILY_ID = famId;
-  setSession({ uid, email, familyId: famId });
+  setSession({ uid, identifier, kind, familyId: famId });
   showDashboard();
 }
 
