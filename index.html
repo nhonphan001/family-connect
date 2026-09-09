@@ -144,6 +144,12 @@
     font-size: 13px; color: #1C3D4E; outline: none;
   }
   .schedule-day-group { margin-bottom: 14px; }
+  .schedule-day-tab {
+    border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
+  }
+  .schedule-day-tab.active { background: #1C3D4E; color: #fff; }
+  .schedule-day-tab.today:not(.active) { box-shadow: inset 0 0 0 2px #2F9E8F; }
   .schedule-day-label {
     font-size: 12px; font-weight: 700; color: #8B9AA5; text-transform: uppercase;
     letter-spacing: 0.5px; margin-bottom: 6px;
@@ -151,6 +157,14 @@
   .schedule-item {
     display: flex; align-items: center; gap: 10px; padding: 8px 0;
     border-bottom: 1px solid #F2F4F5; font-size: 14px;
+  }
+  .schedule-item.current {
+    border: 2px solid #2F9E8F; border-radius: 12px; background: #F0FBF9;
+    padding: 8px 12px; margin: 4px 0;
+  }
+  .schedule-now-tag {
+    font-size: 10px; font-weight: 700; color: #fff; background: #2F9E8F;
+    border-radius: 999px; padding: 2px 8px; margin-right: 4px; flex-shrink: 0;
   }
   .schedule-time {
     font-weight: 700; color: #1C3D4E; min-width: 52px; flex-shrink: 0;
@@ -290,6 +304,7 @@
       <input class="msg-input" id="scheduleTitleInput" placeholder="Tên hoạt động, vd: Học bài" style="flex:1; min-width:160px" />
       <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>
     </div>
+    <div id="scheduleTabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px"></div>
     <div id="scheduleList"></div>
   </div>
 
@@ -340,6 +355,13 @@ const PRESET_APPS = [
 let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
 let activeId = null;
 let state = {}; // { childId: { ..., device, location, locationEnabled } }
+
+function todayDayCode() {
+  const map = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]; // Date.getDay(): 0=CN..6=T7
+  return map[new Date().getDay()];
+}
+let selectedScheduleDay = todayDayCode();
+function selectScheduleDay(day) { selectedScheduleDay = day; render(); }
 
 function defaultChildState() {
   return {
@@ -649,27 +671,36 @@ function render() {
       `<div class="muted">Đã bật định vị — đang đợi máy con gửi vị trí đầu tiên (có thể mất vài phút).</div>`;
   }
 
-  // schedule
-  const dayOrder = ["daily", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-  const dayLabels = { daily: "Hằng ngày", T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
-  const scheduleHtml = dayOrder.map(day => {
-    const items = s.schedule.filter(it => it.day === day).sort((a,b) => a.time.localeCompare(b.time));
-    if (!items.length) return "";
-    return `
-      <div class="schedule-day-group">
-        <div class="schedule-day-label">${dayLabels[day]}</div>
-        ${items.map(it => `
-          <div class="schedule-item">
-            <span class="schedule-time">${it.time}</span>
-            <span class="schedule-title">${it.title}</span>
-            <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }).join("");
-  document.getElementById("scheduleList").innerHTML = scheduleHtml ||
-    `<div class="muted">Chưa có lịch nào — thêm hoạt động đầu tiên ở trên.</div>`;
+  // schedule — hiện dạng tab theo từng thứ, mặc định chọn đúng hôm nay
+  const dayTabs = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const dayLabels = { T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
+  const today = todayDayCode();
+
+  document.getElementById("scheduleTabs").innerHTML = dayTabs.map(day => `
+    <button class="schedule-day-tab ${day===selectedScheduleDay ? 'active' : ''} ${day===today ? 'today' : ''}"
+      onclick="selectScheduleDay('${day}')">${dayLabels[day]}${day===today ? ' • Hôm nay' : ''}</button>
+  `).join("");
+
+  const itemsForSelectedDay = s.schedule
+    .filter(it => it.day === selectedScheduleDay || it.day === "daily")
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  let currentIdx = -1;
+  if (selectedScheduleDay === today) {
+    const nowStr = String(new Date().getHours()).padStart(2,"0") + ":" + String(new Date().getMinutes()).padStart(2,"0");
+    itemsForSelectedDay.forEach((it, i) => { if (it.time <= nowStr) currentIdx = i; });
+  }
+
+  document.getElementById("scheduleList").innerHTML = itemsForSelectedDay.length
+    ? itemsForSelectedDay.map((it, i) => `
+        <div class="schedule-item ${i === currentIdx ? 'current' : ''}">
+          ${i === currentIdx ? '<span class="schedule-now-tag">ĐANG DIỄN RA</span>' : ''}
+          <span class="schedule-time">${it.time}</span>
+          <span class="schedule-title">${it.title}${it.day === "daily" ? ' <span class="muted" style="display:inline">(hằng ngày)</span>' : ''}</span>
+          <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
+        </div>
+      `).join("")
+    : `<div class="muted">Chưa có lịch nào cho ${dayLabels[selectedScheduleDay]} — thêm hoạt động ở trên.</div>`;
 
   // daily limit input (skip overwrite while user is typing)
   const limitInput = document.getElementById("limitInput");
