@@ -573,14 +573,19 @@ async function deleteScheduleItem(id) {
 }
 
 async function requestScreenshot() {
-  const now = Date.now();
-  state[activeId].screenshotRequestedAt = now;
+  state[activeId].screenshotRequestedAt = "pending";
   render();
   try {
-    await fbPut(`families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`, now);
+    const resolved = await fbPut(
+      `families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`,
+      { ".sv": "timestamp" }
+    );
+    state[activeId].screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
   } catch {
+    state[activeId].screenshotRequestedAt = null;
     showError("Không gửi được yêu cầu chụp màn hình — kiểm tra kết nối Firebase.");
   }
+  render();
 }
 
 function addCustomApp() {
@@ -689,7 +694,7 @@ function render() {
   const shot = s.screenshot;
   const reqAt = s.screenshotRequestedAt;
   const btn = document.getElementById("requestScreenshotBtn");
-  const waitingForFresh = reqAt && (!shot || shot.timestamp < reqAt);
+  const waitingForFresh = reqAt && (reqAt === "pending" || !shot || shot.timestamp < reqAt);
   btn.disabled = !!waitingForFresh;
   btn.textContent = waitingForFresh ? "Đang chờ máy con chụp..." : "Chụp màn hình ngay";
   if (waitingForFresh) {
