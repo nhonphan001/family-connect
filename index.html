@@ -133,6 +133,27 @@
     font-size: 12px; border: none; background: none; color: #8B9AA5;
     text-decoration: underline; cursor: pointer; margin-top: 4px; padding: 0;
   }
+  .schedule-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .schedule-form select, .schedule-form input[type="time"] {
+    border: none; background: #EEF2F3; border-radius: 10px; padding: 10px 12px;
+    font-size: 13px; color: #1C3D4E; outline: none;
+  }
+  .schedule-day-group { margin-bottom: 14px; }
+  .schedule-day-label {
+    font-size: 12px; font-weight: 700; color: #8B9AA5; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+  .schedule-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid #F2F4F5; font-size: 14px;
+  }
+  .schedule-time {
+    font-weight: 700; color: #1C3D4E; min-width: 52px; flex-shrink: 0;
+  }
+  .schedule-title { flex: 1; color: #5B7280; }
+  .schedule-del {
+    border: none; background: none; color: #B0BAC2; cursor: pointer; font-size: 16px; padding: 0 4px;
+  }
 </style>
 </head>
 <body>
@@ -244,6 +265,26 @@
   </div>
 
   <div class="card" style="margin-top:16px">
+    <div class="card-title">📅 Thời khóa biểu & sinh hoạt</div>
+    <div class="schedule-form">
+      <select id="scheduleDayInput">
+        <option value="daily">Hằng ngày</option>
+        <option value="T2">Thứ 2</option>
+        <option value="T3">Thứ 3</option>
+        <option value="T4">Thứ 4</option>
+        <option value="T5">Thứ 5</option>
+        <option value="T6">Thứ 6</option>
+        <option value="T7">Thứ 7</option>
+        <option value="CN">Chủ nhật</option>
+      </select>
+      <input type="time" id="scheduleTimeInput" value="18:00" />
+      <input class="msg-input" id="scheduleTitleInput" placeholder="Tên hoạt động, vd: Học bài" style="flex:1; min-width:160px" />
+      <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>
+    </div>
+    <div id="scheduleList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <div class="card-title">💬 Nhắn tin</div>
     <div class="msg-list" id="msgList"></div>
     <div id="quickMsgs"></div>
@@ -295,7 +336,7 @@ function defaultChildState() {
   return {
     dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
     blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
-    location: null, locationEnabled: false
+    location: null, locationEnabled: false, schedule: []
   };
 }
 
@@ -346,6 +387,11 @@ async function fbPost(path, value) {
   if (!res.ok) throw new Error("POST failed " + res.status);
   return res.json();
 }
+async function fbDelete(path) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json`, { method: "DELETE" });
+  if (!res.ok) throw new Error("DELETE failed " + res.status);
+  return res.json();
+}
 
 function prettyAppName(key) {
   const pkg = key.replace(/_/g, ".");
@@ -393,7 +439,10 @@ async function refreshChild(meta) {
       appLimits, usageMap,
       device: (data && data.device) || null,
       location: (data && data.location) || null,
-      locationEnabled: (data && data.rules && data.rules.locationEnabled) || false
+      locationEnabled: (data && data.rules && data.rules.locationEnabled) || false,
+      schedule: data && data.schedule
+        ? Object.entries(data.schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
+        : []
     };
     render();
   } catch (e) {
@@ -447,6 +496,30 @@ async function toggleLocationEnabled() {
   render();
   try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/locationEnabled`, newVal); }
   catch { showError("Không lưu được cài đặt định vị — kiểm tra kết nối Firebase."); }
+}
+
+async function addScheduleItem() {
+  const day = document.getElementById("scheduleDayInput").value;
+  const time = document.getElementById("scheduleTimeInput").value;
+  const titleInput = document.getElementById("scheduleTitleInput");
+  const title = titleInput.value.trim();
+  if (!time || !title) return;
+  const item = { day, time, title };
+  try {
+    const res = await fbPost(`families/${FAMILY_ID}/children/${activeId}/schedule`, item);
+    state[activeId].schedule.push({ id: res.name, ...item });
+    titleInput.value = "";
+    render();
+  } catch {
+    showError("Không lưu được lịch — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function deleteScheduleItem(id) {
+  state[activeId].schedule = state[activeId].schedule.filter(s => s.id !== id);
+  render();
+  try { await fbDelete(`families/${FAMILY_ID}/children/${activeId}/schedule/${id}`); }
+  catch { showError("Không xoá được mục lịch — kiểm tra kết nối Firebase."); }
 }
 
 function addCustomApp() {
@@ -567,6 +640,28 @@ function render() {
       `<div class="muted">Đã bật định vị — đang đợi máy con gửi vị trí đầu tiên (có thể mất vài phút).</div>`;
   }
 
+  // schedule
+  const dayOrder = ["daily", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const dayLabels = { daily: "Hằng ngày", T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
+  const scheduleHtml = dayOrder.map(day => {
+    const items = s.schedule.filter(it => it.day === day).sort((a,b) => a.time.localeCompare(b.time));
+    if (!items.length) return "";
+    return `
+      <div class="schedule-day-group">
+        <div class="schedule-day-label">${dayLabels[day]}</div>
+        ${items.map(it => `
+          <div class="schedule-item">
+            <span class="schedule-time">${it.time}</span>
+            <span class="schedule-title">${it.title}</span>
+            <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+  document.getElementById("scheduleList").innerHTML = scheduleHtml ||
+    `<div class="muted">Chưa có lịch nào — thêm hoạt động đầu tiên ở trên.</div>`;
+
   // daily limit input (skip overwrite while user is typing)
   const limitInput = document.getElementById("limitInput");
   if (document.activeElement !== limitInput) limitInput.value = s.dailyLimit;
@@ -644,6 +739,8 @@ document.getElementById("saveLimitBtn").addEventListener("click", saveDailyLimit
 document.getElementById("addCustomAppBtn").addEventListener("click", addCustomApp);
 document.getElementById("customAppInput").addEventListener("keydown", e => { if (e.key === "Enter") addCustomApp(); });
 document.getElementById("saveAppLimitsBtn").addEventListener("click", saveAppLimits);
+document.getElementById("addScheduleBtn").addEventListener("click", addScheduleItem);
+document.getElementById("scheduleTitleInput").addEventListener("keydown", e => { if (e.key === "Enter") addScheduleItem(); });
 
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
 async function discoverChildren() {
