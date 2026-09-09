@@ -33,6 +33,11 @@
   }
   .kid-name { font-weight: 600; font-size: 14px; }
   .kid-grade { font-size: 12px; color: #8B9AA5; }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px;
+  }
+  .status-line { font-size: 11px; margin-top: 2px; }
   .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
   @media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
   .card { background: #fff; border-radius: 16px; padding: 20px; }
@@ -169,12 +174,31 @@ const PRESET_APPS = [
 ];
 
 let activeId = CHILD_META[0].id;
-let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps } }
-CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [] });
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null });
 
 function todayKey() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 phút không có tín hiệu mới = Offline
+
+function formatAlertTime(ts) {
+  const d = new Date(ts);
+  const isToday = todayKey() === (d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"));
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  if (isToday) return time;
+  return d.toLocaleDateString("vi-VN") + " " + time;
+}
+
+function timeAgo(ts) {
+  const diffMin = Math.floor((Date.now() - ts) / 60000);
+  if (diffMin < 1) return "vừa xong";
+  if (diffMin < 60) return diffMin + " phút trước";
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return diffHr + " giờ trước";
+  return Math.floor(diffHr / 24) + " ngày trước";
 }
 
 function showError(msg) {
@@ -219,18 +243,19 @@ async function refreshChild(meta) {
     const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
     const alerts = data && data.alerts
       ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
-          label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy hôm nay"
+          label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
                : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
                : a.type === "ADMIN_DISABLED" ? "Cảnh báo: quyền quản trị thiết bị bị tắt"
                : "Cảnh báo",
-          time: new Date(a.timestamp).toLocaleTimeString("vi-VN", {hour:"2-digit", minute:"2-digit"})
+          time: formatAlertTime(a.timestamp)
         }))
       : [];
     state[meta.id] = {
       dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
       usedToday, points: (data && data.rewards && data.rewards.points) || 0,
       apps, alerts, messages,
-      blockedApps: (data && data.rules && data.rules.blockedApps) || []
+      blockedApps: (data && data.rules && data.rules.blockedApps) || [],
+      lastSeen: (data && data.status && data.status.lastSeen) || null
     };
     render();
   } catch (e) {
@@ -291,14 +316,27 @@ function render() {
   const s = state[activeId];
 
   // kid selector
-  document.getElementById("kidSelector").innerHTML = CHILD_META.map(c => `
+  document.getElementById("kidSelector").innerHTML = CHILD_META.map(c => {
+    const cs = state[c.id];
+    const online = cs.lastSeen && (Date.now() - cs.lastSeen) < ONLINE_THRESHOLD_MS;
+    const statusText = cs.lastSeen
+      ? (online ? "Đang online" : "Offline · " + timeAgo(cs.lastSeen))
+      : "Chưa có tín hiệu";
+    return `
     <button class="kid-btn ${c.id===activeId?'active':''}"
       style="border-color:${c.id===activeId ? c.color : 'transparent'}"
       onclick="selectKid('${c.id}')">
       <span class="avatar" style="background:${c.bg};color:${c.color}">${c.name[0]}</span>
-      <span><div class="kid-name">${c.name}</div><div class="kid-grade">${c.grade}</div></span>
+      <span>
+        <div class="kid-name">${c.name}</div>
+        <div class="kid-grade">${c.grade}</div>
+        <div class="status-line" style="color:${online ? '#2F9E8F' : '#B0BAC2'}">
+          <span class="status-dot" style="background:${online ? '#2F9E8F' : '#B0BAC2'}"></span>${statusText}
+        </div>
+      </span>
     </button>
-  `).join("");
+  `;
+  }).join("");
 
   // usage
   document.getElementById("usedToday").textContent = s.usedToday;
@@ -365,6 +403,7 @@ document.getElementById("customAppInput").addEventListener("keydown", e => { if 
 render();
 CHILD_META.forEach(refreshChild);
 setInterval(() => CHILD_META.forEach(refreshChild), 5000);
+setInterval(render, 15000); // cập nhật hiển thị "X phút trước" đều đặn
 </script>
 </body>
 </html>
