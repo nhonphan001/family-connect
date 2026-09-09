@@ -79,6 +79,11 @@
   .limit-row .limit-unit { color: #8B9AA5; font-size: 12px; }
   .limit-row .limit-used { color: #8B9AA5; font-size: 12px; width: 90px; flex-shrink: 0; }
   .limit-row .limit-used.over { color: #B5502F; font-weight: 600; }
+  .device-info-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .device-info-item { min-width: 120px; }
+  .device-info-label { color: #8B9AA5; font-size: 12px; margin-bottom: 2px; }
+  .device-info-value { font-weight: 600; font-size: 15px; color: #1C3D4E; }
+  .device-storage { flex: 1; min-width: 180px; }
   .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
   .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
   .msg-parent { align-self: flex-end; color: #fff; }
@@ -119,6 +124,11 @@
         <button class="pill-btn" onclick="awardPoints(50)">+50</button>
       </div>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📱 Thông tin thiết bị</div>
+    <div id="deviceInfo"></div>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -194,8 +204,8 @@ const PRESET_APPS = [
 ];
 
 let activeId = CHILD_META[0].id;
-let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen, appLimits, usageMap } }
-CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {} });
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen, appLimits, usageMap, device } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null });
 
 function todayKey() {
   const d = new Date();
@@ -287,7 +297,8 @@ async function refreshChild(meta) {
       apps, alerts, messages,
       blockedApps: (data && data.rules && data.rules.blockedApps) || [],
       lastSeen: (data && data.status && data.status.lastSeen) || null,
-      appLimits, usageMap
+      appLimits, usageMap,
+      device: (data && data.device) || null
     };
     render();
   } catch (e) {
@@ -396,6 +407,33 @@ function render() {
 
   // points
   document.getElementById("points").textContent = s.points;
+
+  // device info
+  const dev = s.device;
+  document.getElementById("deviceInfo").innerHTML = dev ? `
+    <div class="device-info-grid">
+      <div class="device-info-item">
+        <div class="device-info-label">Thiết bị</div>
+        <div class="device-info-value">${dev.model || "—"}</div>
+        <div class="muted">${dev.androidVersion || ""}</div>
+      </div>
+      <div class="device-info-item">
+        <div class="device-info-label">Pin</div>
+        <div class="device-info-value" style="color:${dev.batteryPercent >= 0 && dev.batteryPercent < 20 ? '#B5502F' : '#1C3D4E'}">
+          ${dev.batteryPercent >= 0 ? dev.batteryPercent + "%" : "—"}
+        </div>
+      </div>
+      <div class="device-storage">
+        <div class="device-info-label">Bộ nhớ đã dùng</div>
+        <div class="device-info-value">
+          ${dev.storageUsedGB != null ? dev.storageUsedGB.toFixed(1) : "?"} / ${dev.storageTotalGB != null ? dev.storageTotalGB.toFixed(1) : "?"} GB
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${dev.storageTotalGB ? Math.min(dev.storageUsedGB / dev.storageTotalGB * 100, 100) : 0}%; background:#6C8EBF"></div>
+        </div>
+      </div>
+    </div>
+  ` : `<div class="muted">Chưa có dữ liệu thiết bị — đợi máy con hoạt động vài phút rồi refresh lại.</div>`;
 
   // daily limit input (skip overwrite while user is typing)
   const limitInput = document.getElementById("limitInput");
