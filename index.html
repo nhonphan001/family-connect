@@ -77,6 +77,8 @@
     padding: 6px 10px; font-size: 13px; color: #1C3D4E; outline: none;
   }
   .limit-row .limit-unit { color: #8B9AA5; font-size: 12px; }
+  .limit-row .limit-used { color: #8B9AA5; font-size: 12px; width: 90px; flex-shrink: 0; }
+  .limit-row .limit-used.over { color: #B5502F; font-weight: 600; }
   .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
   .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
   .msg-parent { align-self: flex-end; color: #fff; }
@@ -192,8 +194,8 @@ const PRESET_APPS = [
 ];
 
 let activeId = CHILD_META[0].id;
-let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen, appLimits } }
-CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null, appLimits: {} });
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen, appLimits, usageMap } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {} });
 
 function todayKey() {
   const d = new Date();
@@ -259,8 +261,12 @@ async function refreshChild(meta) {
     const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
     const apps = Object.entries(usageToday)
       .map(([key, minutes]) => ({ name: prettyAppName(key), minutes: Number(minutes) }))
-      .sort((a,b) => b.minutes - a.minutes).slice(0,6);
-    const usedToday = apps.reduce((s,a) => s + a.minutes, 0);
+      .sort((a,b) => b.minutes - a.minutes).slice(0,15);
+    const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
+    const usageMap = {};
+    Object.entries(usageToday).forEach(([key, minutes]) => {
+      usageMap[key.replace(/_/g, ".")] = Number(minutes);
+    });
     const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
     const alerts = data && data.alerts
       ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
@@ -281,7 +287,7 @@ async function refreshChild(meta) {
       apps, alerts, messages,
       blockedApps: (data && data.rules && data.rules.blockedApps) || [],
       lastSeen: (data && data.status && data.status.lastSeen) || null,
-      appLimits
+      appLimits, usageMap
     };
     render();
   } catch (e) {
@@ -414,9 +420,13 @@ function render() {
     const preset = PRESET_APPS.find(a => a.pkg === pkg);
     const name = preset ? preset.name : prettyFromDotted(pkg);
     const val = s.appLimits[pkg] || "";
+    const used = s.usageMap[pkg] || 0;
+    const limit = s.appLimits[pkg];
+    const isOver = limit && used >= limit;
     return `
       <div class="limit-row">
         <span class="limit-name">${name}</span>
+        <span class="limit-used ${isOver ? 'over' : ''}">Đã dùng: ${used}p</span>
         <input type="number" min="0" step="5" class="limit-input-field" data-pkg="${pkg}" value="${val}" />
         <span class="limit-unit">phút/ngày</span>
       </div>
