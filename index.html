@@ -68,6 +68,15 @@
     border: none; border-radius: 10px; padding: 8px 16px; color: #fff;
     font-size: 13px; cursor: pointer; font-weight: 600;
   }
+  .limit-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px;
+  }
+  .limit-row .limit-name { width: 100px; flex-shrink: 0; color: #5B7280; }
+  .limit-row input {
+    width: 80px; border: none; background: #EEF2F3; border-radius: 8px;
+    padding: 6px 10px; font-size: 13px; color: #1C3D4E; outline: none;
+  }
+  .limit-row .limit-unit { color: #8B9AA5; font-size: 12px; }
   .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
   .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
   .msg-parent { align-self: flex-end; color: #fff; }
@@ -137,6 +146,15 @@
   </div>
 
   <div class="card" style="margin-top:16px">
+    <div class="card-title">⏳ Giới hạn phút/ngày cho từng ứng dụng</div>
+    <div class="muted" style="margin-bottom:10px">
+      Để trống hoặc 0 = không giới hạn riêng (vẫn theo tổng giờ/ngày ở trên)
+    </div>
+    <div id="appLimitRows"></div>
+    <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <div class="card-title">💬 Nhắn tin</div>
     <div class="msg-list" id="msgList"></div>
     <div id="quickMsgs"></div>
@@ -174,8 +192,8 @@ const PRESET_APPS = [
 ];
 
 let activeId = CHILD_META[0].id;
-let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen } }
-CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null });
+let state = {}; // { childId: { dailyLimit, usedToday, points, apps, alerts, messages, blockedApps, lastSeen, appLimits } }
+CHILD_META.forEach(c => state[c.id] = { dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [], blockedApps: [], lastSeen: null, appLimits: {} });
 
 function todayKey() {
   const d = new Date();
@@ -227,6 +245,9 @@ async function fbPost(path, value) {
 
 function prettyAppName(key) {
   const pkg = key.replace(/_/g, ".");
+  return prettyFromDotted(pkg);
+}
+function prettyFromDotted(pkg) {
   const last = pkg.split(".").pop() || pkg;
   return last.charAt(0).toUpperCase() + last.slice(1);
 }
@@ -245,17 +266,22 @@ async function refreshChild(meta) {
       ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
           label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
                : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
+               : a.type === "APP_LIMIT" ? `Đã hết giờ riêng cho: ${prettyFromDotted(a.packageName)}`
                : a.type === "ADMIN_DISABLED" ? "Cảnh báo: quyền quản trị thiết bị bị tắt"
                : "Cảnh báo",
           time: formatAlertTime(a.timestamp)
         }))
       : [];
+    const appLimitsArr = (data && data.rules && data.rules.appLimits) || [];
+    const appLimits = {};
+    appLimitsArr.forEach(entry => { if (entry && entry.pkg) appLimits[entry.pkg] = entry.limitMinutes; });
     state[meta.id] = {
       dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
       usedToday, points: (data && data.rewards && data.rewards.points) || 0,
       apps, alerts, messages,
       blockedApps: (data && data.rules && data.rules.blockedApps) || [],
-      lastSeen: (data && data.status && data.status.lastSeen) || null
+      lastSeen: (data && data.status && data.status.lastSeen) || null,
+      appLimits
     };
     render();
   } catch (e) {
@@ -311,6 +337,21 @@ function addCustomApp() {
   if (!state[activeId].blockedApps.includes(pkg)) toggleBlockedApp(pkg);
 }
 
+async function saveAppLimits() {
+  const rows = document.querySelectorAll(".limit-input-field");
+  const newLimits = {};
+  rows.forEach(inp => {
+    const pkg = inp.dataset.pkg;
+    const val = parseInt(inp.value, 10);
+    if (!isNaN(val) && val > 0) newLimits[pkg] = val;
+  });
+  state[activeId].appLimits = newLimits;
+  render();
+  const arr = Object.entries(newLimits).map(([pkg, limitMinutes]) => ({ pkg, limitMinutes }));
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/appLimits`, arr); }
+  catch { showError("Không lưu được giới hạn theo app — kiểm tra kết nối Firebase."); }
+}
+
 function render() {
   const meta = CHILD_META.find(c => c.id === activeId);
   const s = state[activeId];
@@ -364,6 +405,29 @@ function render() {
       <button class="chip-toggle active" onclick="toggleBlockedApp('${p}')">${p}</button>
     `).join("");
 
+  // per-app minute limits (hiện tất cả app phổ biến + bất kỳ app nào đã có giới hạn riêng)
+  const limitPkgs = PRESET_APPS.map(a => a.pkg)
+    .concat(Object.keys(s.appLimits).filter(p => !PRESET_APPS.some(a => a.pkg === p)));
+  const focusedPkg = document.activeElement && document.activeElement.classList.contains("limit-input-field")
+    ? document.activeElement.dataset.pkg : null;
+  document.getElementById("appLimitRows").innerHTML = limitPkgs.map(pkg => {
+    const preset = PRESET_APPS.find(a => a.pkg === pkg);
+    const name = preset ? preset.name : prettyFromDotted(pkg);
+    const val = s.appLimits[pkg] || "";
+    return `
+      <div class="limit-row">
+        <span class="limit-name">${name}</span>
+        <input type="number" min="0" step="5" class="limit-input-field" data-pkg="${pkg}" value="${val}" />
+        <span class="limit-unit">phút/ngày</span>
+      </div>
+    `;
+  }).join("");
+  // giữ nguyên focus + con trỏ nếu người dùng đang gõ dở
+  if (focusedPkg) {
+    const el = document.querySelector(`.limit-input-field[data-pkg="${focusedPkg}"]`);
+    if (el) el.focus();
+  }
+
   // apps
   document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => `
     <div class="app-row">
@@ -399,6 +463,7 @@ document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key
 document.getElementById("saveLimitBtn").addEventListener("click", saveDailyLimit);
 document.getElementById("addCustomAppBtn").addEventListener("click", addCustomApp);
 document.getElementById("customAppInput").addEventListener("keydown", e => { if (e.key === "Enter") addCustomApp(); });
+document.getElementById("saveAppLimitsBtn").addEventListener("click", saveAppLimits);
 
 render();
 CHILD_META.forEach(refreshChild);
