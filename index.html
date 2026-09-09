@@ -262,11 +262,11 @@ async function refreshChild(meta) {
     const apps = Object.entries(usageToday)
       .map(([key, minutes]) => ({ name: prettyAppName(key), minutes: Number(minutes) }))
       .sort((a,b) => b.minutes - a.minutes).slice(0,15);
-    const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
     const usageMap = {};
     Object.entries(usageToday).forEach(([key, minutes]) => {
       usageMap[key.replace(/_/g, ".")] = Number(minutes);
     });
+    const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
     const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
     const alerts = data && data.alerts
       ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
