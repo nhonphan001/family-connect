@@ -58,6 +58,12 @@
     justify-content: space-between; flex-wrap: wrap; gap: 12px;
   }
   .extension-banner-text { font-size: 14px; color: #7A5C1E; font-weight: 600; }
+  .pairing-banner {
+    background: #E9F0FB; border: 2px solid #6C8EBF; border-radius: 16px;
+    padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .pairing-banner-text { font-size: 14px; color: #2E4A6B; font-weight: 600; }
   .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
   .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
   .app-bar-fill { height: 14px; border-radius: 8px; }
@@ -221,6 +227,7 @@
     </div>
   </div>
   <div id="errBox"></div>
+  <div id="pendingDeviceBanner"></div>
 
   <div class="kids" id="kidSelector"></div>
   <div class="muted" id="noChildrenMsg" style="display:none; margin:20px 0">
@@ -375,7 +382,16 @@ const PRESET_APPS = [
 
 let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
 let activeId = null;
+let pendingDevices = []; // thiết bị đang xin ghép nối, chờ phụ huynh Duyệt
 let state = {}; // { childId: { ..., device, location, locationEnabled } }
+
+function slugifyName(name) {
+  const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return normalized.toLowerCase()
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "be";
+}
 
 function todayDayCode() {
   const map = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]; // Date.getDay(): 0=CN..6=T7
@@ -421,27 +437,58 @@ function showError(msg) {
   document.getElementById("errBox").innerHTML = msg ? `<div class="err">${msg}</div>` : "";
 }
 
+// ---------- Đính kèm token đăng nhập vào mọi request, tự làm mới khi hết hạn ----------
+let authTokens = null; // { idToken, refreshToken, expiresAt }
+
+async function getValidIdToken() {
+  if (!authTokens) return null;
+  if (Date.now() < authTokens.expiresAt - 60000) return authTokens.idToken; // còn hạn (chừa 1 phút)
+  try {
+    const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(authTokens.refreshToken)}`
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error("refresh failed");
+    authTokens = {
+      idToken: data.id_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Date.now() + Number(data.expires_in) * 1000
+    };
+    persistSession();
+    return authTokens.idToken;
+  } catch (e) {
+    return authTokens.idToken; // thử dùng token cũ, thà lỗi rõ ràng còn hơn kẹt cứng
+  }
+}
+
+async function authQueryParam() {
+  const token = await getValidIdToken();
+  return token ? `?auth=${token}` : "";
+}
+
 async function fbGet(path) {
-  const res = await fetch(`${FIREBASE_URL}/${path}.json`);
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`);
   if (!res.ok) throw new Error("GET failed " + res.status);
   return res.json();
 }
 async function fbPut(path, value) {
-  const res = await fetch(`${FIREBASE_URL}/${path}.json`, {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
     method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
   });
   if (!res.ok) throw new Error("PUT failed " + res.status);
   return res.json();
 }
 async function fbPost(path, value) {
-  const res = await fetch(`${FIREBASE_URL}/${path}.json`, {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
     method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
   });
   if (!res.ok) throw new Error("POST failed " + res.status);
   return res.json();
 }
 async function fbDelete(path) {
-  const res = await fetch(`${FIREBASE_URL}/${path}.json`, { method: "DELETE" });
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, { method: "DELETE" });
   if (!res.ok) throw new Error("DELETE failed " + res.status);
   return res.json();
 }
@@ -635,6 +682,16 @@ async function saveAppLimits() {
 }
 
 function render() {
+  document.getElementById("pendingDeviceBanner").innerHTML = pendingDevices.map(d => `
+    <div class="pairing-banner">
+      <div class="pairing-banner-text">📱 Thiết bị mới xin ghép nối: ${d.childName}${d.childGrade ? " (" + d.childGrade + ")" : ""}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="pill-btn" onclick="approveDevice('${d.deviceUid}', '${d.childName.replace(/'/g,"\\'")}', '${(d.childGrade||"").replace(/'/g,"\\'")}')">Duyệt</button>
+        <button class="app-block-btn" onclick="rejectDevice('${d.deviceUid}')">Từ chối</button>
+      </div>
+    </div>
+  `).join("");
+
   document.getElementById("kidSelector").innerHTML = childrenMeta.map(c => {
     const cs = state[c.id];
     const online = cs.lastSeen && (Date.now() - cs.lastSeen) < ONLINE_THRESHOLD_MS;
@@ -877,6 +934,43 @@ document.getElementById("addScheduleBtn").addEventListener("click", addScheduleI
 document.getElementById("scheduleTitleInput").addEventListener("keydown", e => { if (e.key === "Enter") addScheduleItem(); });
 
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
+async function fetchPendingDevices() {
+  try {
+    const data = await fbGet(`families/${FAMILY_ID}/pendingDevices`);
+    pendingDevices = data
+      ? Object.entries(data).map(([deviceUid, v]) => ({
+          deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
+        }))
+      : [];
+  } catch (e) {
+    pendingDevices = [];
+  }
+}
+
+async function approveDevice(deviceUid, childName, childGrade) {
+  const childId = slugifyName(childName);
+  try {
+    await fbPut(`families/${FAMILY_ID}/approvedDevices/${deviceUid}`, { childId, approvedAt: { ".sv": "timestamp" } });
+    await fbPut(`families/${FAMILY_ID}/children/${childId}/profile`, { name: childName, grade: childGrade || "" });
+    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+    pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
+    render();
+    await refreshAll();
+  } catch {
+    showError("Không duyệt được thiết bị — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function rejectDevice(deviceUid) {
+  try {
+    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+    pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
+    render();
+  } catch {
+    showError("Không từ chối được yêu cầu — kiểm tra kết nối Firebase.");
+  }
+}
+
 async function discoverChildren() {
   if (!FAMILY_ID) return;
   try {
@@ -898,6 +992,7 @@ async function discoverChildren() {
 
 async function refreshAll() {
   await discoverChildren();
+  await fetchPendingDevices();
   for (const m of childrenMeta) await refreshChild(m);
   render();
 }
@@ -912,6 +1007,12 @@ function getSession() {
 }
 function setSession(session) { localStorage.setItem("fc_session", JSON.stringify(session)); }
 function clearSession() { localStorage.removeItem("fc_session"); }
+
+// Lưu lại authTokens mới nhất (sau khi tự làm mới) vào cùng session đã lưu trước đó
+function persistSession() {
+  const existing = getSession();
+  if (existing) setSession({ ...existing, authTokens });
+}
 
 function randomFamilyCode() {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // bỏ ký tự dễ nhầm 0/O, 1/I
@@ -1021,6 +1122,11 @@ async function handleAuthSubmit() {
       errBox.style.display = "block";
       return;
     }
+    authTokens = {
+      idToken: data.idToken,
+      refreshToken: data.refreshToken,
+      expiresAt: Date.now() + Number(data.expiresIn) * 1000
+    };
     await onAuthSuccess(data.localId, idType === "phone" ? normalizeVNPhone(rawIdentifier) : rawIdentifier, idType);
   } catch (e) {
     errBox.textContent = "Lỗi kết nối, thử lại sau.";
@@ -1035,10 +1141,14 @@ async function onAuthSuccess(uid, identifier, kind) {
     const existing = await fbGet(`users/${uid}/familyId`);
     if (existing) {
       famId = existing;
+      // Bù lại ownerUid cho tài khoản đã tạo trước khi có luật bảo mật mới
+      await fbPut(`families/${famId}/meta/ownerUid`, uid).catch(() => {});
     } else {
       famId = randomFamilyCode();
       await fbPut(`users/${uid}/familyId`, famId);
-      const meta = kind === "phone" ? { ownerPhone: identifier, createdAt: Date.now() } : { ownerEmail: identifier, createdAt: Date.now() };
+      const meta = kind === "phone"
+        ? { ownerUid: uid, ownerPhone: identifier, createdAt: Date.now() }
+        : { ownerUid: uid, ownerEmail: identifier, createdAt: Date.now() };
       await fbPut(`families/${famId}/meta`, meta);
     }
   } catch (e) {
@@ -1047,7 +1157,7 @@ async function onAuthSuccess(uid, identifier, kind) {
     return;
   }
   FAMILY_ID = famId;
-  setSession({ uid, identifier, kind, familyId: famId });
+  setSession({ uid, identifier, kind, familyId: famId, authTokens });
   showDashboard();
 }
 
@@ -1068,8 +1178,9 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 
 // ---------- Khởi động ----------
 const existingSession = getSession();
-if (existingSession && existingSession.familyId) {
+if (existingSession && existingSession.familyId && existingSession.authTokens) {
   FAMILY_ID = existingSession.familyId;
+  authTokens = existingSession.authTokens;
   showDashboard();
 } else {
   document.getElementById("authScreen").style.display = "block";
