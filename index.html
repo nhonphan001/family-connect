@@ -105,6 +105,10 @@
     width: 100%; height: 220px; border: none; border-radius: 12px; margin-top: 8px;
   }
   .location-link { font-size: 13px; color: #6C8EBF; text-decoration: none; }
+  .screenshot-img {
+    max-width: 240px; width: 100%; border-radius: 12px; margin-top: 4px; display: block;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  }
   .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .toggle-switch {
     position: relative; width: 42px; height: 24px; border-radius: 999px;
@@ -279,6 +283,12 @@
   </div>
 
   <div class="card" style="margin-top:16px">
+    <div class="card-title">📸 Chụp màn hình</div>
+    <button class="save-btn" id="requestScreenshotBtn" style="background:#6C8EBF">Chụp màn hình ngay</button>
+    <div id="screenshotInfo" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
     <div class="card-title">📍 Vị trí gần nhất</div>
     <div class="toggle-row">
       <button class="toggle-switch" id="locationToggle" onclick="toggleLocationEnabled()"></button>
@@ -405,7 +415,7 @@ function defaultChildState() {
     dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
     blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
     location: null, locationEnabled: false, schedule: [], currentApp: null,
-    bonusMinutesToday: 0, extensionRequests: []
+    bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null
   };
 }
 
@@ -547,7 +557,9 @@ async function refreshChild(meta) {
       bonusMinutesToday: (data && data.rules && data.rules.bonusMinutes && data.rules.bonusMinutes[todayKey()]) || 0,
       extensionRequests: data && data.extensionRequests
         ? Object.entries(data.extensionRequests).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
-        : []
+        : [],
+      screenshot: (data && data.screenshot) || null,
+      screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
     };
     render();
   } catch (e) {
@@ -603,6 +615,22 @@ async function grantBonusMinutes(minutes) {
 
 async function dismissExtensionRequests() {
   await clearPendingExtensionRequests();
+  render();
+}
+
+async function requestScreenshot() {
+  state[activeId].screenshotRequestedAt = "pending";
+  render();
+  try {
+    const resolved = await fbPut(
+      `families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`,
+      { ".sv": "timestamp" }
+    );
+    state[activeId].screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
+  } catch {
+    state[activeId].screenshotRequestedAt = null;
+    showError("Không gửi được yêu cầu chụp màn hình — kiểm tra kết nối Firebase.");
+  }
   render();
 }
 
@@ -799,6 +827,26 @@ function render() {
        </div>`
     : `<div class="muted">Không có dữ liệu gần đây (máy có thể đang tắt màn hình hoặc offline).</div>`;
 
+  // screenshot
+  const shot = s.screenshot;
+  const reqAt = s.screenshotRequestedAt;
+  const scBtn = document.getElementById("requestScreenshotBtn");
+  const waitingForFresh = reqAt && (reqAt === "pending" || !shot || shot.timestamp < reqAt);
+  scBtn.disabled = !!waitingForFresh;
+  scBtn.textContent = waitingForFresh ? "Đang chờ máy con chụp..." : "Chụp màn hình ngay";
+  if (waitingForFresh) {
+    document.getElementById("screenshotInfo").innerHTML =
+      `<div class="muted">Đã gửi yêu cầu — máy con cần đang mở màn hình và có mạng để chụp được. Có thể mất khoảng 1 phút.</div>`;
+  } else if (shot) {
+    document.getElementById("screenshotInfo").innerHTML = `
+      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" />
+      <div class="muted" style="margin-top:6px">Chụp lúc: ${timeAgo(shot.timestamp)}</div>
+    `;
+  } else {
+    document.getElementById("screenshotInfo").innerHTML =
+      `<div class="muted">Chưa có ảnh nào — bấm nút phía trên để yêu cầu chụp.</div>`;
+  }
+
   // location
   const toggle = document.getElementById("locationToggle");
   if (s.locationEnabled) toggle.classList.add("on"); else toggle.classList.remove("on");
@@ -932,6 +980,7 @@ document.getElementById("customAppInput").addEventListener("keydown", e => { if 
 document.getElementById("saveAppLimitsBtn").addEventListener("click", saveAppLimits);
 document.getElementById("addScheduleBtn").addEventListener("click", addScheduleItem);
 document.getElementById("scheduleTitleInput").addEventListener("keydown", e => { if (e.key === "Enter") addScheduleItem(); });
+document.getElementById("requestScreenshotBtn").addEventListener("click", requestScreenshot);
 
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
 async function fetchPendingDevices() {
