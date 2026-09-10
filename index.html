@@ -47,6 +47,11 @@
   .bar-fill { height: 8px; border-radius: 8px; }
   .muted { color: #8B9AA5; font-size: 12px; margin-top: 8px; }
   .app-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .app-block-btn {
+    font-size: 11px; border: none; background: #EEF2F3; color: #5B7280;
+    border-radius: 999px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  }
+  .app-block-btn.blocked { background: #FFE3DA; color: #B5502F; font-weight: 600; }
   .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
   .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
   .app-bar-fill { height: 14px; border-radius: 8px; }
@@ -455,7 +460,7 @@ async function refreshChild(meta) {
     showError(null);
     const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
     const apps = Object.entries(usageToday)
-      .map(([key, minutes]) => ({ name: prettyAppName(key), minutes: Number(minutes) }))
+      .map(([key, minutes]) => ({ name: prettyAppName(key), pkg: key.replace(/_/g, "."), minutes: Number(minutes) }))
       .filter(a => a.minutes > 0)
       .sort((a,b) => b.minutes - a.minutes).slice(0,15);
     const usageMap = {};
@@ -685,9 +690,17 @@ function render() {
 
   // current app
   const ca = s.currentApp;
-  document.getElementById("currentAppInfo").innerHTML = (ca && ca.timestamp && (Date.now() - ca.timestamp) < ONLINE_THRESHOLD_MS)
-    ? `<div style="font-weight:700; font-size:16px; color:#1C3D4E">${prettyFromDotted(ca.packageName)}</div>
-       <div class="muted">Cập nhật ${timeAgo(ca.timestamp)}</div>`
+  const caLive = ca && ca.timestamp && (Date.now() - ca.timestamp) < ONLINE_THRESHOLD_MS;
+  document.getElementById("currentAppInfo").innerHTML = caLive
+    ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap">
+         <div>
+           <div style="font-weight:700; font-size:16px; color:#1C3D4E">${prettyFromDotted(ca.packageName)}</div>
+           <div class="muted">Cập nhật ${timeAgo(ca.timestamp)}</div>
+         </div>
+         <button class="app-block-btn ${s.blockedApps.includes(ca.packageName) ? 'blocked' : ''}" onclick="toggleBlockedApp('${ca.packageName}')">
+           ${s.blockedApps.includes(ca.packageName) ? '✕ Đã chặn' : 'Chặn ứng dụng này'}
+         </button>
+       </div>`
     : `<div class="muted">Không có dữ liệu gần đây (máy có thể đang tắt màn hình hoặc offline).</div>`;
 
   // screenshot
@@ -778,9 +791,11 @@ function render() {
       <button class="chip-toggle active" onclick="toggleBlockedApp('${p}')">${p}</button>
     `).join("");
 
-  // per-app minute limits (hiện tất cả app phổ biến + bất kỳ app nào đã có giới hạn riêng)
+  // per-app minute limits (hiện tất cả app phổ biến + đã có giới hạn riêng + đã bị chặn thủ công)
   const limitPkgs = PRESET_APPS.map(a => a.pkg)
-    .concat(Object.keys(s.appLimits).filter(p => !PRESET_APPS.some(a => a.pkg === p)));
+    .concat(Object.keys(s.appLimits).filter(p => !PRESET_APPS.some(a => a.pkg === p)))
+    .concat(s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p)))
+    .filter((p, i, arr) => arr.indexOf(p) === i); // bỏ trùng
   const focusedPkg = document.activeElement && document.activeElement.classList.contains("limit-input-field")
     ? document.activeElement.dataset.pkg : null;
   document.getElementById("appLimitRows").innerHTML = limitPkgs.map(pkg => {
@@ -806,13 +821,17 @@ function render() {
   }
 
   // apps
-  document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => `
+  document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => {
+    const isBlocked = s.blockedApps.includes(a.pkg);
+    return `
     <div class="app-row">
       <span class="app-name">${a.name}</span>
       <div class="app-bar-bg"><div class="app-bar-fill" style="width:${Math.min(a.minutes*3,100)}%;background:${meta.color};opacity:${1 - i*0.12}"></div></div>
       <span>${a.minutes}p</span>
+      <button class="app-block-btn ${isBlocked ? 'blocked' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${isBlocked ? '✕ Đã chặn' : 'Chặn'}</button>
     </div>
-  `).join("") : `<div class="muted">Chưa có dữ liệu hôm nay</div>`;
+  `;
+  }).join("") : `<div class="muted">Chưa có dữ liệu hôm nay</div>`;
 
   // alerts
   document.getElementById("alertsCard").style.display = s.alerts.length ? "block" : "none";
