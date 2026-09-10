@@ -52,6 +52,12 @@
     border-radius: 999px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
   }
   .app-block-btn.blocked { background: #FFE3DA; color: #B5502F; font-weight: 600; }
+  .extension-banner {
+    background: #FFF7E0; border: 2px solid #F2A93B; border-radius: 16px;
+    padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .extension-banner-text { font-size: 14px; color: #7A5C1E; font-weight: 600; }
   .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
   .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
   .app-bar-fill { height: 14px; border-radius: 8px; }
@@ -228,6 +234,8 @@
   <div id="childSections"></div>
 
   <div id="childDetailSections">
+  <div id="extensionRequestBanner"></div>
+
   <div class="grid two">
     <div class="card">
       <div class="card-title">⏱ Thời gian dùng máy hôm nay</div>
@@ -244,6 +252,16 @@
         <button class="pill-btn" onclick="awardPoints(20)">+20</button>
         <button class="pill-btn" onclick="awardPoints(50)">+50</button>
       </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">🎁 Thưởng thêm thời gian chơi</div>
+    <div class="muted" id="bonusTodayLine" style="margin-bottom:10px"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="pill-btn" onclick="grantBonusMinutes(10)">+10 phút</button>
+      <button class="pill-btn" onclick="grantBonusMinutes(15)">+15 phút</button>
+      <button class="pill-btn" onclick="grantBonusMinutes(30)">+30 phút</button>
     </div>
   </div>
 
@@ -388,7 +406,7 @@ function defaultChildState() {
     dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
     blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
     location: null, locationEnabled: false, schedule: [], currentApp: null,
-    screenshot: null, screenshotRequestedAt: null
+    screenshot: null, screenshotRequestedAt: null, bonusMinutesToday: 0, extensionRequests: []
   };
 }
 
@@ -497,7 +515,11 @@ async function refreshChild(meta) {
         : [],
       currentApp: (data && data.status && data.status.currentApp) || null,
       screenshot: (data && data.screenshot) || null,
-      screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
+      screenshotRequestedAt: state[meta.id].screenshotRequestedAt, // giữ nguyên, chỉ đổi khi bấm nút chụp
+      bonusMinutesToday: (data && data.rules && data.rules.bonusMinutes && data.rules.bonusMinutes[todayKey()]) || 0,
+      extensionRequests: data && data.extensionRequests
+        ? Object.entries(data.extensionRequests).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
+        : []
     };
     render();
   } catch (e) {
@@ -523,6 +545,37 @@ async function awardPoints(amount) {
   render();
   try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rewards/points`, newTotal); }
   catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
+}
+
+async function clearPendingExtensionRequests() {
+  const reqs = state[activeId].extensionRequests.filter(r => r.status === "pending");
+  for (const r of reqs) {
+    try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/extensionRequests/${r.id}/status`, "handled"); }
+    catch { /* bỏ qua, không quan trọng bằng việc đã thưởng giờ */ }
+  }
+  state[activeId].extensionRequests = state[activeId].extensionRequests.map(r =>
+    r.status === "pending" ? { ...r, status: "handled" } : r
+  );
+}
+
+async function grantBonusMinutes(minutes) {
+  const today = todayKey();
+  const newBonus = (state[activeId].bonusMinutesToday || 0) + minutes;
+  state[activeId].bonusMinutesToday = newBonus;
+  render();
+  try {
+    await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/bonusMinutes/${today}`, newBonus);
+    await fbPost(`families/${FAMILY_ID}/children/${activeId}/rewardEvents`, { minutes, timestamp: { ".sv": "timestamp" } });
+    await clearPendingExtensionRequests();
+    render();
+  } catch {
+    showError("Không thưởng được thời gian — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function dismissExtensionRequests() {
+  await clearPendingExtensionRequests();
+  render();
 }
 
 async function saveDailyLimit() {
@@ -649,14 +702,35 @@ function render() {
   const meta = childrenMeta.find(c => c.id === activeId);
   const s = state[activeId];
 
-  // usage
+  // usage (giới hạn hiệu lực = giới hạn gốc + giờ được thưởng hôm nay)
+  const effectiveLimit = s.dailyLimit + (s.bonusMinutesToday || 0);
   document.getElementById("usedToday").textContent = s.usedToday;
-  document.getElementById("limitLine").textContent = `/ ${s.dailyLimit} phút`;
-  const pct = Math.min((s.usedToday / s.dailyLimit) * 100, 100);
+  document.getElementById("limitLine").textContent = s.bonusMinutesToday > 0
+    ? `/ ${effectiveLimit} phút (gồm +${s.bonusMinutesToday}p thưởng)`
+    : `/ ${effectiveLimit} phút`;
+  const pct = Math.min((s.usedToday / effectiveLimit) * 100, 100);
   const bar = document.getElementById("usageBar");
   bar.style.width = pct + "%";
   bar.style.background = pct > 90 ? "#FF7A59" : meta.color;
-  document.getElementById("remainLine").textContent = `Còn lại ${Math.max(s.dailyLimit - s.usedToday,0)} phút hôm nay`;
+  document.getElementById("remainLine").textContent = `Còn lại ${Math.max(effectiveLimit - s.usedToday,0)} phút hôm nay`;
+
+  // bonus time card
+  document.getElementById("bonusTodayLine").textContent = s.bonusMinutesToday > 0
+    ? `Đã thưởng hôm nay: +${s.bonusMinutesToday} phút`
+    : "Chưa thưởng thêm giờ nào hôm nay";
+
+  // extension request banner
+  const pendingReq = s.extensionRequests.filter(r => r.status === "pending").sort((a,b) => b.timestamp - a.timestamp)[0];
+  document.getElementById("extensionRequestBanner").innerHTML = pendingReq ? `
+    <div class="extension-banner">
+      <div class="extension-banner-text">🙋 ${meta.name} xin thêm giờ lúc ${timeAgo(pendingReq.timestamp)}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="pill-btn" onclick="grantBonusMinutes(15)">Cho +15 phút</button>
+        <button class="pill-btn" onclick="grantBonusMinutes(30)">Cho +30 phút</button>
+        <button class="app-block-btn" onclick="dismissExtensionRequests()">Bỏ qua</button>
+      </div>
+    </div>
+  ` : "";
 
   // points
   document.getElementById("points").textContent = s.points;
