@@ -349,7 +349,6 @@
   <div class="card" style="margin-top:16px">
     <div class="card-title">💬 Nhắn tin</div>
     <div class="msg-list" id="msgList"></div>
-    <div id="quickMsgs"></div>
     <div class="msg-input-row">
       <input class="msg-input" id="msgInput" placeholder="Nhắn điều gì đó tích cực..." />
       <button class="send-btn" id="sendBtn">➤</button>
@@ -372,12 +371,6 @@ const CHILD_COLORS = [
   { color: "#2F9E8F", bg: "#DFF3EF" },
   { color: "#B5502F", bg: "#FBE3DA" },
   { color: "#8E6CBF", bg: "#EDE3F5" },
-];
-const QUICK_MESSAGES = [
-  "Giỏi lắm, tiếp tục nha!",
-  "Còn 15 phút nữa hết giờ nhé",
-  "Nhớ nghỉ mắt một chút",
-  "Tối nay nhà mình ăn gì con thích?",
 ];
 const PRESET_APPS = [
   { name: "YouTube", pkg: "com.google.android.youtube" },
@@ -918,15 +911,9 @@ function render() {
     <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
       style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
   `).join("");
-
-  // quick messages
-  document.getElementById("quickMsgs").innerHTML = QUICK_MESSAGES.map(q => `
-    <button class="quick-msg-btn" onclick="quickSend('${q.replace(/'/g,"\\'")}')">${q}</button>
-  `).join("");
 }
 
 function selectKid(id) { activeId = id; render(); }
-function quickSend(text) { document.getElementById("msgInput").value = text; sendMessage(); }
 
 document.getElementById("sendBtn").addEventListener("click", sendMessage);
 document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
