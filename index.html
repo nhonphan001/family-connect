@@ -1031,11 +1031,18 @@
      }
   }
 
+let refreshInProgress = false;
   async function refreshAll() {
-     await discoverChildren();
-     await fetchPendingDevices();
-     for (const m of childrenMeta) await refreshChild(m);
-     render();
+     if (refreshInProgress) return; // tránh chồng lệnh khi lần trước chưa xong (gây dồn ứ request)
+     refreshInProgress = true;
+     try {
+          await discoverChildren();
+          await fetchPendingDevices();
+          for (const m of childrenMeta) await refreshChild(m);
+          render();
+     } finally {
+          refreshInProgress = false;
+     }
   }
 
   // ---------- Đăng ký / Đăng nhập (dùng thẳng REST API của Firebase Auth, không cần SDK) ----------
