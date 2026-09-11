@@ -191,24 +191,24 @@
  <body>
 
   <div class="auth-wrap" id="authScreen">
-     <h1 style="text-align:center">Sổ Bé Ngoan</h1>h1>
-     <div class="sub" style="text-align:center; margin-bottom:20px">Quản lý & kết nối với các con</div>div>
+     <h1 style="text-align:center">Sổ Bé Ngoan</h1>
+     <div class="sub" style="text-align:center; margin-bottom:20px">Quản lý & kết nối với các con</div>
      <div class="auth-card">
-          <div class="sub" id="authModeLabel" style="margin-bottom:14px">Đăng nhập</div>div>
+          <div class="sub" id="authModeLabel" style="margin-bottom:14px">Đăng nhập</div>
           <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px">
-                 <button class="id-type-btn active" id="idTypePhoneBtn">Số điện thoại</button>button>
-                 <button class="id-type-btn" id="idTypeEmailBtn">Email</button>button>
-          </div>div>
+                 <button class="id-type-btn active" id="idTypePhoneBtn">Số điện thoại</button>
+                 <button class="id-type-btn" id="idTypeEmailBtn">Email</button>
+          </div>
           <input class="auth-input" id="authIdentifier" type="tel" placeholder="Số điện thoại (vd: 0912345678)" />
           <input class="auth-input" id="authPassword" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" />
-          <div id="authError" class="err" style="display:none"></div>div>
-          <button class="auth-submit" id="authSubmitBtn">Đăng nhập</button>button>
+          <div id="authError" class="err" style="display:none"></div>
+          <button class="auth-submit" id="authSubmitBtn">Đăng nhập</button>
           <div class="auth-switch">
-                 <span id="authToggleText">Chưa có tài khoản?</span>span>
-                 <a href="#" id="authToggleLink">Đăng ký ngay</a>a>
-          </div>div>
-     </div>div>
-  </div>div>
+                 <span id="authToggleText">Chưa có tài khoản?</span>
+                 <a href="#" id="authToggleLink">Đăng ký ngay</a>
+          </div>
+     </div>
+  </div>
 
   <div class="wrap" id="dashboardApp" style="display:none">
      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px">
@@ -219,7 +219,7 @@
          <div class="family-code-box">
                <div class="muted" style="margin-top:0">Mã gia đình (cho bé nhập vào app)</div>
                <div class="family-code-value" id="familyCodeText">------</div>
-               <button class="logout-btn" id="logoutBtn">Đăng xuất</button>button>
+               <button class="logout-btn" id="logoutBtn">Đăng xuất</button>
          </div>
      </div>
     <div id="errBox"></div>
@@ -247,9 +247,9 @@
                 <div class="card-title">⭐ Điểm thưởng</div>
                 <div class="big-num" id="points" style="color:#2F9E8F">0</div>
                 <div style="margin-top:10px">
-                        <button class="pill-btn" onclick="awardPoints(10)">+10</button>button>
-                        <button class="pill-btn" onclick="awardPoints(20)">+20</button>button>
-                        <button class="pill-btn" onclick="awardPoints(50)">+50</button>button>
+                        <button class="pill-btn" onclick="awardPoints(10)">+10</button>
+                        <button class="pill-btn" onclick="awardPoints(20)">+20</button>
+                        <button class="pill-btn" onclick="awardPoints(50)">+50</button>
                 </div>
           </div>
       </div>
@@ -258,9 +258,9 @@
           <div class="card-title">🎁 Thưởng thêm thời gian chơi</div>
           <div class="muted" id="bonusTodayLine" style="margin-bottom:10px"></div>
           <div style="display:flex; gap:8px; flex-wrap:wrap">
-                <button class="pill-btn" onclick="grantBonusMinutes(10)">+10 phút</button>button>
-                <button class="pill-btn" onclick="grantBonusMinutes(15)">+15 phút</button>button>
-                <button class="pill-btn" onclick="grantBonusMinutes(30)">+30 phút</button>button>
+                <button class="pill-btn" onclick="grantBonusMinutes(10)">+10 phút</button>
+                <button class="pill-btn" onclick="grantBonusMinutes(15)">+15 phút</button>
+                <button class="pill-btn" onclick="grantBonusMinutes(30)">+30 phút</button>
           </div>
       </div>
     
@@ -276,15 +276,15 @@
     
       <div class="card" style="margin-top:16px">
           <div class="card-title">📸 Chụp màn hình</div>
-          <button class="save-btn" id="requestScreenshotBtn" style="background:#6C8EBF">Chụp màn hình ngay</button>button>
+          <button class="save-btn" id="requestScreenshotBtn" style="background:#6C8EBF">Chụp màn hình ngay</button>
           <div id="screenshotInfo" style="margin-top:12px"></div>
       </div>
     
       <div class="card" style="margin-top:16px">
           <div class="card-title">📍 Vị trí gần nhất</div>
           <div class="toggle-row">
-                <button class="toggle-switch" id="locationToggle" onclick="toggleLocationEnabled()"></button>button>
-                <span class="muted">Bật định vị (cập nhật tối đa mỗi 5 phút)</span>span>
+                <button class="toggle-switch" id="locationToggle" onclick="toggleLocationEnabled()"></button>
+                <span class="muted">Bật định vị (cập nhật tối đa mỗi 5 phút)</span>
           </div>
           <div id="locationInfo"></div>
       </div>
@@ -304,14 +304,14 @@
           <div class="muted" style="margin-bottom:10px">Giới hạn thời gian dùng máy mỗi ngày (phút)</div>
           <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap">
                 <input type="number" id="limitInput" class="msg-input" style="max-width:100px; flex:none" min="0" step="5" />
-                <span class="muted">phút / ngày</span>span>
-                <button class="save-btn" id="saveLimitBtn" style="background:#2F9E8F">Lưu</button>button>
+                <span class="muted">phút / ngày</span>
+                <button class="save-btn" id="saveLimitBtn" style="background:#2F9E8F">Lưu</button>
           </div>
           <div class="muted" style="margin-bottom:8px">Bấm để chặn/bỏ chặn ứng dụng</div>
           <div id="blockedAppChips"></div>
           <div style="display:flex; gap:8px; margin-top:10px">
                 <input class="msg-input" id="customAppInput" placeholder="Tên gói khác, ví dụ: com.example.app" />
-                <button class="save-btn" id="addCustomAppBtn" style="background:#5B7280">Thêm</button>button>
+                <button class="save-btn" id="addCustomAppBtn" style="background:#5B7280">Thêm</button>
           </div>
       </div>
     
@@ -321,25 +321,25 @@
                 Để trống hoặc 0 = không giới hạn riêng (vẫn theo tổng giờ/ngày ở trên)
           </div>
           <div id="appLimitRows"></div>
-          <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>button>
+          <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>
       </div>
     
       <div class="card" style="margin-top:16px">
           <div class="card-title">📅 Thời khóa biểu & sinh hoạt</div>
           <div class="schedule-form">
                 <select id="scheduleDayInput">
-                        <option value="daily">Hằng ngày</option>option>
-                        <option value="T2">Thứ 2</option>option>
-                        <option value="T3">Thứ 3</option>option>
-                        <option value="T4">Thứ 4</option>option>
-                        <option value="T5">Thứ 5</option>option>
-                        <option value="T6">Thứ 6</option>option>
-                        <option value="T7">Thứ 7</option>option>
-                        <option value="CN">Chủ nhật</option>option>
-                </select>select>
+                        <option value="daily">Hằng ngày</option>
+                        <option value="T2">Thứ 2</option>
+                        <option value="T3">Thứ 3</option>
+                        <option value="T4">Thứ 4</option>
+                        <option value="T5">Thứ 5</option>
+                        <option value="T6">Thứ 6</option>
+                        <option value="T7">Thứ 7</option>
+                        <option value="CN">Chủ nhật</option>
+                </select>
                 <input type="time" id="scheduleTimeInput" value="18:00" />
                 <input class="msg-input" id="scheduleTitleInput" placeholder="Tên hoạt động, vd: Học bài" style="flex:1; min-width:160px" />
-                <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>button>
+                <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>
           </div>
           <div id="scheduleTabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px"></div>
           <div id="scheduleList"></div>
@@ -350,7 +350,7 @@
           <div class="msg-list" id="msgList"></div>
           <div class="msg-input-row">
                 <input class="msg-input" id="msgInput" placeholder="Nhắn điều gì đó tích cực..." />
-                <button class="send-btn" id="sendBtn">➤</button>button>
+                <button class="send-btn" id="sendBtn">➤</button>
           </div>
       </div>
     </div>
