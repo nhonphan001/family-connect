@@ -1,1238 +1,1239 @@
 <!DOCTYPE html>
 <html lang="vi">
- <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sổ Bé Ngoan</title>
- <style>
-    * { box-sizing: border-box; }
-    body {
-         margin: 0;
-         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         background: #EEF2F3;
-         color: #1C3D4E;
-    }
-    .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
-    h1 { font-size: 26px; font-weight: 800; margin: 0; }
-    .sub { color: #5B7280; font-size: 14px; margin-top: 4px; }
-    .err {
-         margin-top: 12px; background: #FFF1EC; color: #B5502F;
-         padding: 10px 16px; border-radius: 12px; font-size: 14px;
-    }
-    .kids { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
-    .kid-btn {
-         display: flex; align-items: center; gap: 10px;
-         background: #fff; border-radius: 16px; padding: 10px 16px;
-         border: 2px solid transparent; cursor: pointer; text-align: left;
-    }
-    .kid-btn.active { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
-    .avatar {
-         width: 40px; height: 40px; border-radius: 50%;
-         display: flex; align-items: center; justify-content: center;
-         font-weight: 700;
-    }
-    .kid-name { font-weight: 600; font-size: 14px; }
-    .kid-grade { font-size: 12px; color: #8B9AA5; }
-    .status-dot {
-         display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-         margin-right: 5px;
-    }
-    .status-line { font-size: 11px; margin-top: 2px; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
-    .card { background: #fff; border-radius: 16px; padding: 20px; }
-    .card-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .big-num { font-size: 30px; font-weight: 800; }
-    .bar-bg { background: #EEF2F3; height: 8px; border-radius: 8px; margin-top: 8px; }
-    .bar-fill { height: 8px; border-radius: 8px; }
-    .muted { color: #8B9AA5; font-size: 12px; margin-top: 8px; }
-    .app-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
-    .app-block-btn {
-         font-size: 11px; border: none; background: #EEF2F3; color: #5B7280;
-         border-radius: 999px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
-    }
-    .app-block-btn.blocked { background: #FFE3DA; color: #B5502F; font-weight: 600; }
-    .extension-banner {
-         background: #FFF7E0; border: 2px solid #F2A93B; border-radius: 16px;
-         padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
-         justify-content: space-between; flex-wrap: wrap; gap: 12px;
-    }
-    .extension-banner-text { font-size: 14px; color: #7A5C1E; font-weight: 600; }
-    .pairing-banner {
-         background: #E9F0FB; border: 2px solid #6C8EBF; border-radius: 16px;
-         padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
-         justify-content: space-between; flex-wrap: wrap; gap: 12px;
-    }
-    .pairing-banner-text { font-size: 14px; color: #2E4A6B; font-weight: 600; }
-    .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
-    .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
-    .app-bar-fill { height: 14px; border-radius: 8px; }
-    .alert-item { border-left: 3px solid #FF7A59; padding: 4px 0 4px 12px; font-size: 14px; color: #5B7280; margin-bottom: 6px; }
-    .pill-btn {
-         font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
-         background: #E9F6F3; color: #2F9E8F; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
-    }
-    .quick-msg-btn {
-         font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
-         background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
-    }
-    .chip-toggle {
-         font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
-         background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
-    }
-    .chip-toggle.active { background: #FFE3DA; color: #B5502F; font-weight: 600; }
-    .save-btn {
-         border: none; border-radius: 10px; padding: 8px 16px; color: #fff;
-         font-size: 13px; cursor: pointer; font-weight: 600;
-    }
-    .limit-row {
-         display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px;
-    }
-    .limit-row .limit-name { width: 100px; flex-shrink: 0; color: #5B7280; }
-    .limit-row input {
-         width: 80px; border: none; background: #EEF2F3; border-radius: 8px;
-         padding: 6px 10px; font-size: 13px; color: #1C3D4E; outline: none;
-    }
-    .limit-row .limit-unit { color: #8B9AA5; font-size: 12px; }
-    .limit-row .limit-used { color: #8B9AA5; font-size: 12px; width: 90px; flex-shrink: 0; }
-    .limit-row .limit-used.over { color: #B5502F; font-weight: 600; }
-    .device-info-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
-    .device-info-item { min-width: 120px; }
-    .device-info-label { color: #8B9AA5; font-size: 12px; margin-bottom: 2px; }
-    .device-info-value { font-weight: 600; font-size: 15px; color: #1C3D4E; }
-    .device-storage { flex: 1; min-width: 180px; }
-    .location-map {
-         width: 100%; height: 220px; border: none; border-radius: 12px; margin-top: 8px;
-    }
-    .location-link { font-size: 13px; color: #6C8EBF; text-decoration: none; }
-    .screenshot-img {
-         max-width: 240px; width: 100%; border-radius: 12px; margin-top: 4px; display: block;
-         box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-    }
-    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .toggle-switch {
-         position: relative; width: 42px; height: 24px; border-radius: 999px;
-         background: #EEF2F3; border: none; cursor: pointer; flex-shrink: 0;
-    }
-    .toggle-switch.on { background: #2F9E8F; }
-    .toggle-switch::after {
-         content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
-         border-radius: 50%; background: #fff; transition: left 0.15s;
-    }
-    .toggle-switch.on::after { left: 21px; }
-    .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
-    .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
-    .msg-parent { align-self: flex-end; color: #fff; }
-    .msg-child { align-self: flex-start; background: #EEF2F3; }
-    .msg-input-row { display: flex; gap: 8px; }
-    .msg-input {
-         flex: 1; border: none; background: #EEF2F3; border-radius: 12px;
-         padding: 10px 12px; font-size: 14px; outline: none; color: #1C3D4E;
-    }
-    .send-btn {
-         border: none; border-radius: 12px; padding: 0 16px; color: #fff;
-         font-size: 16px; cursor: pointer;
-    }
-    .auth-wrap { max-width: 380px; margin: 60px auto; padding: 24px; }
-    .auth-card { background: #fff; border-radius: 16px; padding: 28px 24px; }
-    .auth-input {
-         width: 100%; border: none; background: #EEF2F3; border-radius: 10px;
-         padding: 12px 14px; font-size: 14px; color: #1C3D4E; outline: none;
-         margin-bottom: 12px; box-sizing: border-box;
-    }
-    .auth-submit {
-         width: 100%; border: none; border-radius: 10px; padding: 12px; color: #fff;
-         font-size: 14px; font-weight: 600; cursor: pointer; background: #2F9E8F; margin-top: 4px;
-    }
-    .auth-switch { text-align: center; margin-top: 16px; font-size: 13px; color: #5B7280; }
-    .auth-switch a { color: #6C8EBF; text-decoration: none; font-weight: 600; }
-    .family-code-box { text-align: right; }
-    .family-code-value {
-         font-weight: 800; font-size: 22px; letter-spacing: 3px; color: #1C3D4E;
-    }
-    .logout-btn {
-         font-size: 12px; border: none; background: none; color: #8B9AA5;
-         text-decoration: underline; cursor: pointer; margin-top: 4px; padding: 0;
-    }
-    .id-type-btn {
-         border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
-         padding: 8px 16px; border-radius: 999px; cursor: pointer; font-weight: 600;
-    }
-    .id-type-btn.active { background: #2F9E8F; color: #fff; }
-    .schedule-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
-    .schedule-form select, .schedule-form input[type="time"] {
-         border: none; background: #EEF2F3; border-radius: 10px; padding: 10px 12px;
-         font-size: 13px; color: #1C3D4E; outline: none;
-    }
-    .schedule-day-group { margin-bottom: 14px; }
-    .schedule-day-tab {
-         border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
-         padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
-    }
-    .schedule-day-tab.active { background: #1C3D4E; color: #fff; }
-    .schedule-day-tab.today:not(.active) { box-shadow: inset 0 0 0 2px #2F9E8F; }
-    .schedule-day-label {
-         font-size: 12px; font-weight: 700; color: #8B9AA5; text-transform: uppercase;
-         letter-spacing: 0.5px; margin-bottom: 6px;
-    }
-    .schedule-item {
-         display: flex; align-items: center; gap: 10px; padding: 8px 0;
-         border-bottom: 1px solid #F2F4F5; font-size: 14px;
-    }
-    .schedule-item.current {
-         border: 2pxidth: 52px; flex-shrink: 0;
-    }
-    .schedule-title { flex: 1; color: #5B7280; }
-    .schedule-del {
-         border: none; background: none; color: #B0BAC2; cursor: pointer; font-size: 16px; padding: 0 4px;
-    }
-  </style>
- </head>
- <body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sổ Bé Ngoan</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #EEF2F3;
+    color: #1C3D4E;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 26px; font-weight: 800; margin: 0; }
+  .sub { color: #5B7280; font-size: 14px; margin-top: 4px; }
+  .err {
+    margin-top: 12px; background: #FFF1EC; color: #B5502F;
+    padding: 10px 16px; border-radius: 12px; font-size: 14px;
+  }
+  .kids { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+  .kid-btn {
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border-radius: 16px; padding: 10px 16px;
+    border: 2px solid transparent; cursor: pointer; text-align: left;
+  }
+  .kid-btn.active { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .kid-name { font-weight: 600; font-size: 14px; }
+  .kid-grade { font-size: 12px; color: #8B9AA5; }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px;
+  }
+  .status-line { font-size: 11px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+  .card { background: #fff; border-radius: 16px; padding: 20px; }
+  .card-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .big-num { font-size: 30px; font-weight: 800; }
+  .bar-bg { background: #EEF2F3; height: 8px; border-radius: 8px; margin-top: 8px; }
+  .bar-fill { height: 8px; border-radius: 8px; }
+  .muted { color: #8B9AA5; font-size: 12px; margin-top: 8px; }
+  .app-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .app-block-btn {
+    font-size: 11px; border: none; background: #EEF2F3; color: #5B7280;
+    border-radius: 999px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  }
+  .app-block-btn.blocked { background: #FFE3DA; color: #B5502F; font-weight: 600; }
+  .extension-banner {
+    background: #FFF7E0; border: 2px solid #F2A93B; border-radius: 16px;
+    padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .extension-banner-text { font-size: 14px; color: #7A5C1E; font-weight: 600; }
+  .pairing-banner {
+    background: #E9F0FB; border: 2px solid #6C8EBF; border-radius: 16px;
+    padding: 16px; margin-bottom: 16px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .pairing-banner-text { font-size: 14px; color: #2E4A6B; font-weight: 600; }
+  .app-name { width: 130px; flex-shrink: 0; color: #5B7280; }
+  .app-bar-bg { flex: 1; background: #EEF2F3; border-radius: 8px; height: 14px; overflow: hidden; }
+  .app-bar-fill { height: 14px; border-radius: 8px; }
+  .alert-item { border-left: 3px solid #FF7A59; padding: 4px 0 4px 12px; font-size: 14px; color: #5B7280; margin-bottom: 6px; }
+  .pill-btn {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #E9F6F3; color: #2F9E8F; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .quick-msg-btn {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .chip-toggle {
+    font-size: 12px; border: none; border-radius: 999px; padding: 6px 12px;
+    background: #EEF2F3; color: #5B7280; cursor: pointer; margin-right: 6px; margin-bottom: 6px;
+  }
+  .chip-toggle.active { background: #FFE3DA; color: #B5502F; font-weight: 600; }
+  .save-btn {
+    border: none; border-radius: 10px; padding: 8px 16px; color: #fff;
+    font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .limit-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px;
+  }
+  .limit-row .limit-name { width: 100px; flex-shrink: 0; color: #5B7280; }
+  .limit-row input {
+    width: 80px; border: none; background: #EEF2F3; border-radius: 8px;
+    padding: 6px 10px; font-size: 13px; color: #1C3D4E; outline: none;
+  }
+  .limit-row .limit-unit { color: #8B9AA5; font-size: 12px; }
+  .limit-row .limit-used { color: #8B9AA5; font-size: 12px; width: 90px; flex-shrink: 0; }
+  .limit-row .limit-used.over { color: #B5502F; font-weight: 600; }
+  .device-info-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .device-info-item { min-width: 120px; }
+  .device-info-label { color: #8B9AA5; font-size: 12px; margin-bottom: 2px; }
+  .device-info-value { font-weight: 600; font-size: 15px; color: #1C3D4E; }
+  .device-storage { flex: 1; min-width: 180px; }
+  .location-map {
+    width: 100%; height: 220px; border: none; border-radius: 12px; margin-top: 8px;
+  }
+  .location-link { font-size: 13px; color: #6C8EBF; text-decoration: none; }
+  .screenshot-img {
+    max-width: 240px; width: 100%; border-radius: 12px; margin-top: 4px; display: block;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .toggle-switch {
+    position: relative; width: 42px; height: 24px; border-radius: 999px;
+    background: #EEF2F3; border: none; cursor: pointer; flex-shrink: 0;
+  }
+  .toggle-switch.on { background: #2F9E8F; }
+  .toggle-switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; transition: left 0.15s;
+  }
+  .toggle-switch.on::after { left: 21px; }
+  .msg-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
+  .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+  .msg-parent { align-self: flex-end; color: #fff; }
+  .msg-child { align-self: flex-start; background: #EEF2F3; }
+  .msg-input-row { display: flex; gap: 8px; }
+  .msg-input {
+    flex: 1; border: none; background: #EEF2F3; border-radius: 12px;
+    padding: 10px 12px; font-size: 14px; outline: none; color: #1C3D4E;
+  }
+  .send-btn {
+    border: none; border-radius: 12px; padding: 0 16px; color: #fff;
+    font-size: 16px; cursor: pointer;
+  }
+  .auth-wrap { max-width: 380px; margin: 60px auto; padding: 24px; }
+  .auth-card { background: #fff; border-radius: 16px; padding: 28px 24px; }
+  .auth-input {
+    width: 100%; border: none; background: #EEF2F3; border-radius: 10px;
+    padding: 12px 14px; font-size: 14px; color: #1C3D4E; outline: none;
+    margin-bottom: 12px; box-sizing: border-box;
+  }
+  .auth-submit {
+    width: 100%; border: none; border-radius: 10px; padding: 12px; color: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; background: #2F9E8F; margin-top: 4px;
+  }
+  .auth-switch { text-align: center; margin-top: 16px; font-size: 13px; color: #5B7280; }
+  .auth-switch a { color: #6C8EBF; text-decoration: none; font-weight: 600; }
+  .family-code-box { text-align: right; }
+  .family-code-value {
+    font-weight: 800; font-size: 22px; letter-spacing: 3px; color: #1C3D4E;
+  }
+  .logout-btn {
+    font-size: 12px; border: none; background: none; color: #8B9AA5;
+    text-decoration: underline; cursor: pointer; margin-top: 4px; padding: 0;
+  }
+  .id-type-btn {
+    border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
+    padding: 8px 16px; border-radius: 999px; cursor: pointer; font-weight: 600;
+  }
+  .id-type-btn.active { background: #2F9E8F; color: #fff; }
+  .schedule-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .schedule-form select, .schedule-form input[type="time"] {
+    border: none; background: #EEF2F3; border-radius: 10px; padding: 10px 12px;
+    font-size: 13px; color: #1C3D4E; outline: none;
+  }
+  .schedule-day-group { margin-bottom: 14px; }
+  .schedule-day-tab {
+    border: none; background: #EEF2F3; color: #5B7280; font-size: 13px;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
+  }
+  .schedule-day-tab.active { background: #1C3D4E; color: #fff; }
+  .schedule-day-tab.today:not(.active) { box-shadow: inset 0 0 0 2px #2F9E8F; }
+  .schedule-day-label {
+    font-size: 12px; font-weight: 700; color: #8B9AA5; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+  .schedule-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 1px solid #F2F4F5; font-size: 14px;
+  }
+  .schedule-item.current {
+    border: 2px solid #2F9E8F; border-radius: 12px; background: #F0FBF9;
+    padding: 8px 12px; margin: 4px 0;
+  }
+  .schedule-now-tag {
+    font-size: 10px; font-weight: 700; color: #fff; background: #2F9E8F;
+    border-radius: 999px; padding: 2px 8px; margin-right: 4px; flex-shrink: 0;
+  }
+  .schedule-time {
+    font-weight: 700; color: #1C3D4E; min-width: 52px; flex-shrink: 0;
+  }
+  .schedule-title { flex: 1; color: #5B7280; }
+  .schedule-del {
+    border: none; background: none; color: #B0BAC2; cursor: pointer; font-size: 16px; padding: 0 4px;
+  }
+</style>
+</head>
+<body>
 
-  <div class="auth-wrap" id="authScreen">
-     <h1 style="text-align:center">Sổ Bé Ngoan</h1>
-     <div class="sub" style="text-align:center; margin-bottom:20px">Quản lý & kết nối với các con</div>
-     <div class="auth-card">
-          <div class="sub" id="authModeLabel" style="margin-bottom:14px">Đăng nhập</div>
-          <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px">
-                 <button class="id-type-btn active" id="idTypePhoneBtn">Số điện thoại</button>
-                 <button class="id-type-btn" id="idTypeEmailBtn">Email</button>
-          </div>
-          <input class="auth-input" id="authIdentifier" type="tel" placeholder="Số điện thoại (vd: 0912345678)" />
-          <input class="auth-input" id="authPassword" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" />
-          <div id="authError" class="err" style="display:none"></div>
-          <button class="auth-submit" id="authSubmitBtn">Đăng nhập</button>
-          <div class="auth-switch">
-                 <span id="authToggleText">Chưa có tài khoản?</span>
-                 <a href="#" id="authToggleLink">Đăng ký ngay</a>
-          </div>
-     </div>
+<div class="auth-wrap" id="authScreen">
+  <h1 style="text-align:center">Sổ Bé Ngoan</h1>
+  <div class="sub" style="text-align:center; margin-bottom:20px">Quản lý & kết nối với các con</div>
+  <div class="auth-card">
+    <div class="sub" id="authModeLabel" style="margin-bottom:14px">Đăng nhập</div>
+    <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px">
+      <button class="id-type-btn active" id="idTypePhoneBtn">Số điện thoại</button>
+      <button class="id-type-btn" id="idTypeEmailBtn">Email</button>
+    </div>
+    <input class="auth-input" id="authIdentifier" type="tel" placeholder="Số điện thoại (vd: 0912345678)" />
+    <input class="auth-input" id="authPassword" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" />
+    <div id="authError" class="err" style="display:none"></div>
+    <button class="auth-submit" id="authSubmitBtn">Đăng nhập</button>
+    <div class="auth-switch">
+      <span id="authToggleText">Chưa có tài khoản?</span>
+      <a href="#" id="authToggleLink">Đăng ký ngay</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="dashboardApp" style="display:none">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px">
+    <div>
+      <h1>Sổ Bé Ngoan</h1>
+      <div class="sub">Theo dõi và kết nối với các con khi dùng máy</div>
+    </div>
+    <div class="family-code-box">
+      <div class="muted" style="margin-top:0">Mã gia đình (cho bé nhập vào app)</div>
+      <div class="family-code-value" id="familyCodeText">------</div>
+      <button class="logout-btn" id="logoutBtn">Đăng xuất</button>
+    </div>
+  </div>
+  <div id="errBox"></div>
+  <div id="pendingDeviceBanner"></div>
+
+  <div class="kids" id="kidSelector"></div>
+  <div class="muted" id="noChildrenMsg" style="display:none; margin:20px 0">
+    Chưa có bé nào ghép nối. Đưa Mã gia đình ở trên cho bé nhập vào app Sổ Bé Ngoan trên điện thoại của bé.
   </div>
 
-  <div class="wrap" id="dashboardApp" style="display:none">
-     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px">
-          <div>
-                 <h1>Sổ Bé Ngoan</h1>
-                <div class="sub">Theo dõi và kết nối với các con khi dùng máy</div>
-          </div>
-         <div class="family-code-box">
-               <div class="muted" style="margin-top:0">Mã gia đình (cho bé nhập vào app)</div>
-               <div class="family-code-value" id="familyCodeText">------</div>
-               <button class="logout-btn" id="logoutBtn">Đăng xuất</button>
+  <div id="childSections"></div>
+
+  <div id="childDetailSections">
+  <div id="extensionRequestBanner"></div>
+
+  <div class="grid two">
+    <div class="card">
+      <div class="card-title">⏱ Thời gian dùng máy hôm nay</div>
+      <div class="big-num" id="usedToday">0</div>
+      <div class="muted" id="limitLine"></div>
+      <div class="bar-bg"><div class="bar-fill" id="usageBar"></div></div>
+      <div class="muted" id="remainLine"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">⭐ Điểm thưởng</div>
+      <div class="big-num" id="points" style="color:#2F9E8F">0</div>
+      <div style="margin-top:10px">
+        <button class="pill-btn" onclick="awardPoints(10)">+10</button>
+        <button class="pill-btn" onclick="awardPoints(20)">+20</button>
+        <button class="pill-btn" onclick="awardPoints(50)">+50</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">🎁 Thưởng thêm thời gian chơi</div>
+    <div class="muted" id="bonusTodayLine" style="margin-bottom:10px"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="pill-btn" onclick="grantBonusMinutes(10)">+10 phút</button>
+      <button class="pill-btn" onclick="grantBonusMinutes(15)">+15 phút</button>
+      <button class="pill-btn" onclick="grantBonusMinutes(30)">+30 phút</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📱 Thông tin thiết bị</div>
+    <div id="deviceInfo"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">🟢 Đang dùng ứng dụng</div>
+    <div id="currentAppInfo"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📸 Chụp màn hình</div>
+    <button class="save-btn" id="requestScreenshotBtn" style="background:#6C8EBF">Chụp màn hình ngay</button>
+    <div id="screenshotInfo" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📍 Vị trí gần nhất</div>
+    <div class="toggle-row">
+      <button class="toggle-switch" id="locationToggle" onclick="toggleLocationEnabled()"></button>
+      <span class="muted">Bật định vị (cập nhật tối đa mỗi 5 phút)</span>
+    </div>
+    <div id="locationInfo"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📱 Ứng dụng dùng nhiều nhất</div>
+    <div id="appList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px" id="alertsCard">
+    <div class="card-title">⚠️ Thông báo gần đây</div>
+    <div id="alertList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">🔒 Giới hạn & chặn ứng dụng</div>
+    <div class="muted" style="margin-bottom:10px">Giới hạn thời gian dùng máy mỗi ngày (phút)</div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap">
+      <input type="number" id="limitInput" class="msg-input" style="max-width:100px; flex:none" min="0" step="5" />
+      <span class="muted">phút / ngày</span>
+      <button class="save-btn" id="saveLimitBtn" style="background:#2F9E8F">Lưu</button>
+    </div>
+    <div class="muted" style="margin-bottom:8px">Bấm để chặn/bỏ chặn ứng dụng</div>
+    <div id="blockedAppChips"></div>
+    <div style="display:flex; gap:8px; margin-top:10px">
+      <input class="msg-input" id="customAppInput" placeholder="Tên gói khác, ví dụ: com.example.app" />
+      <button class="save-btn" id="addCustomAppBtn" style="background:#5B7280">Thêm</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">⏳ Giới hạn phút/ngày cho từng ứng dụng</div>
+    <div class="muted" style="margin-bottom:10px">
+      Để trống hoặc 0 = không giới hạn riêng (vẫn theo tổng giờ/ngày ở trên)
+    </div>
+    <div id="appLimitRows"></div>
+    <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">📅 Thời khóa biểu & sinh hoạt</div>
+    <div class="schedule-form">
+      <select id="scheduleDayInput">
+        <option value="daily">Hằng ngày</option>
+        <option value="T2">Thứ 2</option>
+        <option value="T3">Thứ 3</option>
+        <option value="T4">Thứ 4</option>
+        <option value="T5">Thứ 5</option>
+        <option value="T6">Thứ 6</option>
+        <option value="T7">Thứ 7</option>
+        <option value="CN">Chủ nhật</option>
+      </select>
+      <input type="time" id="scheduleTimeInput" value="18:00" />
+      <input class="msg-input" id="scheduleTitleInput" placeholder="Tên hoạt động, vd: Học bài" style="flex:1; min-width:160px" />
+      <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>
+    </div>
+    <div id="scheduleTabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px"></div>
+    <div id="scheduleList"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">💬 Nhắn tin</div>
+    <div class="msg-list" id="msgList"></div>
+    <div class="msg-input-row">
+      <input class="msg-input" id="msgInput" placeholder="Nhắn điều gì đó tích cực..." />
+      <button class="send-btn" id="sendBtn">➤</button>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+const FIREBASE_URL = "https://family-connect-694a7-default-rtdb.asia-southeast1.firebasedatabase.app";
+// ⚠️ Lấy ở Firebase Console > Project Settings (biểu tượng bánh răng) > General > "Web API Key"
+const FIREBASE_API_KEY = "AIzaSyAmeZjEYX7arEzphoZo0OCuURWhgAz9gBI";
+const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
+
+let FAMILY_ID = null; // được gán sau khi đăng nhập/đăng ký thành công
+
+const CHILD_COLORS = [
+  { color: "#F2A93B", bg: "#FCEBCB" },
+  { color: "#6C8EBF", bg: "#E1E9F5" },
+  { color: "#2F9E8F", bg: "#DFF3EF" },
+  { color: "#B5502F", bg: "#FBE3DA" },
+  { color: "#8E6CBF", bg: "#EDE3F5" },
+];
+const PRESET_APPS = [
+  { name: "YouTube", pkg: "com.google.android.youtube" },
+  { name: "TikTok", pkg: "com.zhiliaoapp.musically" },
+  { name: "Facebook", pkg: "com.facebook.katana" },
+  { name: "Messenger", pkg: "com.facebook.orca" },
+  { name: "Instagram", pkg: "com.instagram.android" },
+  { name: "Zalo", pkg: "com.zing.zalo" },
+  { name: "Chrome", pkg: "com.android.chrome" },
+  { name: "CH Play", pkg: "com.android.vending" },
+];
+
+let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
+let activeId = null;
+let pendingDevices = []; // thiết bị đang xin ghép nối, chờ phụ huynh Duyệt
+let state = {}; // { childId: { ..., device, location, locationEnabled } }
+
+function slugifyName(name) {
+  const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return normalized.toLowerCase()
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "be";
+}
+
+function todayDayCode() {
+  const map = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]; // Date.getDay(): 0=CN..6=T7
+  return map[new Date().getDay()];
+}
+let selectedScheduleDay = todayDayCode();
+function selectScheduleDay(day) { selectedScheduleDay = day; render(); }
+
+function defaultChildState() {
+  return {
+    dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
+    blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
+    location: null, locationEnabled: false, schedule: [], currentApp: null,
+    bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null
+  };
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 phút không có tín hiệu mới = Offline
+
+function formatAlertTime(ts) {
+  const d = new Date(ts);
+  const isToday = todayKey() === (d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"));
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  if (isToday) return time;
+  return d.toLocaleDateString("vi-VN") + " " + time;
+}
+
+function timeAgo(ts) {
+  const diffMin = Math.floor((Date.now() - ts) / 60000);
+  if (diffMin < 1) return "vừa xong";
+  if (diffMin < 60) return diffMin + " phút trước";
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return diffHr + " giờ trước";
+  return Math.floor(diffHr / 24) + " ngày trước";
+}
+
+function showError(msg) {
+  document.getElementById("errBox").innerHTML = msg ? `<div class="err">${msg}</div>` : "";
+}
+
+// ---------- Đính kèm token đăng nhập vào mọi request, tự làm mới khi hết hạn ----------
+let authTokens = null; // { idToken, refreshToken, expiresAt }
+
+async function getValidIdToken() {
+  if (!authTokens) return null;
+  if (Date.now() < authTokens.expiresAt - 60000) return authTokens.idToken; // còn hạn (chừa 1 phút)
+  try {
+    const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(authTokens.refreshToken)}`
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error("refresh failed");
+    authTokens = {
+      idToken: data.id_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Date.now() + Number(data.expires_in) * 1000
+    };
+    persistSession();
+    return authTokens.idToken;
+  } catch (e) {
+    return authTokens.idToken; // thử dùng token cũ, thà lỗi rõ ràng còn hơn kẹt cứng
+  }
+}
+
+async function authQueryParam() {
+  const token = await getValidIdToken();
+  return token ? `?auth=${token}` : "";
+}
+
+async function fbGet(path) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`);
+  if (!res.ok) throw new Error("GET failed " + res.status);
+  return res.json();
+}
+async function fbPut(path, value) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
+    method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
+  });
+  if (!res.ok) throw new Error("PUT failed " + res.status);
+  return res.json();
+}
+async function fbPost(path, value) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
+  });
+  if (!res.ok) throw new Error("POST failed " + res.status);
+  return res.json();
+}
+async function fbDelete(path) {
+  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("DELETE failed " + res.status);
+  return res.json();
+}
+
+function prettyAppName(key) {
+  const pkg = key.replace(/_/g, ".");
+  return prettyFromDotted(pkg);
+}
+function prettyFromDotted(pkg) {
+  const last = pkg.split(".").pop() || pkg;
+  return last.charAt(0).toUpperCase() + last.slice(1);
+}
+
+async function refreshChild(meta) {
+  try {
+    const data = await fbGet(`families/${FAMILY_ID}/children/${meta.id}`);
+    showError(null);
+    const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
+    const apps = Object.entries(usageToday)
+      .map(([key, minutes]) => ({ name: prettyAppName(key), pkg: key.replace(/_/g, "."), minutes: Number(minutes) }))
+      .filter(a => a.minutes > 0)
+      .sort((a,b) => b.minutes - a.minutes).slice(0,15);
+    const usageMap = {};
+    Object.entries(usageToday).forEach(([key, minutes]) => {
+      usageMap[key.replace(/_/g, ".")] = Number(minutes);
+    });
+    const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
+    const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
+    const alerts = data && data.alerts
+      ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
+          label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
+               : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
+               : a.type === "APP_LIMIT" ? `Đã hết giờ riêng cho: ${prettyFromDotted(a.packageName)}`
+               : a.type === "ADMIN_DISABLED" ? "Cảnh báo: quyền quản trị thiết bị bị tắt"
+               : "Cảnh báo",
+          time: formatAlertTime(a.timestamp)
+        }))
+      : [];
+    const appLimitsArr = (data && data.rules && data.rules.appLimits) || [];
+    const appLimits = {};
+    appLimitsArr.forEach(entry => { if (entry && entry.pkg) appLimits[entry.pkg] = entry.limitMinutes; });
+    state[meta.id] = {
+      dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
+      usedToday, points: (data && data.rewards && data.rewards.points) || 0,
+      apps, alerts, messages,
+      blockedApps: (data && data.rules && data.rules.blockedApps) || [],
+      lastSeen: (data && data.status && data.status.lastSeen) || null,
+      appLimits, usageMap,
+      device: (data && data.device) || null,
+      location: (data && data.location) || null,
+      locationEnabled: (data && data.rules && data.rules.locationEnabled) || false,
+      schedule: data && data.schedule
+        ? Object.entries(data.schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
+        : [],
+      currentApp: (data && data.status && data.status.currentApp) || null,
+      bonusMinutesToday: (data && data.rules && data.rules.bonusMinutes && data.rules.bonusMinutes[todayKey()]) || 0,
+      extensionRequests: data && data.extensionRequests
+        ? Object.entries(data.extensionRequests).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
+        : [],
+      screenshot: (data && data.screenshot) || null,
+      screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
+    };
+    render();
+  } catch (e) {
+    showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById("msgInput");
+  const text = input.value.trim();
+  if (!text) return;
+  const msg = { from: "parent", text, timestamp: Date.now() };
+  state[activeId].messages.push(msg);
+  input.value = "";
+  render();
+  try { await fbPost(`families/${FAMILY_ID}/children/${activeId}/messages`, msg); }
+  catch { showError("Không gửi được tin nhắn — kiểm tra kết nối Firebase."); }
+}
+
+async function awardPoints(amount) {
+  const newTotal = state[activeId].points + amount;
+  state[activeId].points = newTotal;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rewards/points`, newTotal); }
+  catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
+}
+
+async function clearPendingExtensionRequests() {
+  const reqs = state[activeId].extensionRequests.filter(r => r.status === "pending");
+  for (const r of reqs) {
+    try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/extensionRequests/${r.id}/status`, "handled"); }
+    catch { /* bỏ qua, không quan trọng bằng việc đã thưởng giờ */ }
+  }
+  state[activeId].extensionRequests = state[activeId].extensionRequests.map(r =>
+    r.status === "pending" ? { ...r, status: "handled" } : r
+  );
+}
+
+async function grantBonusMinutes(minutes) {
+  const today = todayKey();
+  const newBonus = (state[activeId].bonusMinutesToday || 0) + minutes;
+  state[activeId].bonusMinutesToday = newBonus;
+  render();
+  try {
+    await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/bonusMinutes/${today}`, newBonus);
+    await fbPost(`families/${FAMILY_ID}/children/${activeId}/rewardEvents`, { minutes, timestamp: { ".sv": "timestamp" } });
+    await clearPendingExtensionRequests();
+    render();
+  } catch {
+    showError("Không thưởng được thời gian — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function dismissExtensionRequests() {
+  await clearPendingExtensionRequests();
+  render();
+}
+
+async function requestScreenshot() {
+  state[activeId].screenshotRequestedAt = "pending";
+  render();
+  try {
+    const resolved = await fbPut(
+      `families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`,
+      { ".sv": "timestamp" }
+    );
+    state[activeId].screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
+  } catch {
+    state[activeId].screenshotRequestedAt = null;
+    showError("Không gửi được yêu cầu chụp màn hình — kiểm tra kết nối Firebase.");
+  }
+  render();
+}
+
+async function saveDailyLimit() {
+  const input = document.getElementById("limitInput");
+  const val = parseInt(input.value, 10);
+  if (isNaN(val) || val < 0) return;
+  state[activeId].dailyLimit = val;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/dailyLimitMinutes`, val); }
+  catch { showError("Không lưu được giới hạn giờ — kiểm tra kết nối Firebase."); }
+}
+
+async function toggleBlockedApp(pkg) {
+  const list = state[activeId].blockedApps.slice();
+  const idx = list.indexOf(pkg);
+  if (idx >= 0) list.splice(idx, 1); else list.push(pkg);
+  state[activeId].blockedApps = list;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/blockedApps`, list); }
+  catch { showError("Không lưu được danh sách chặn — kiểm tra kết nối Firebase."); }
+}
+
+async function toggleLocationEnabled() {
+  const newVal = !state[activeId].locationEnabled;
+  state[activeId].locationEnabled = newVal;
+  render();
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/locationEnabled`, newVal); }
+  catch { showError("Không lưu được cài đặt định vị — kiểm tra kết nối Firebase."); }
+}
+
+async function addScheduleItem() {
+  const day = document.getElementById("scheduleDayInput").value;
+  const time = document.getElementById("scheduleTimeInput").value;
+  const titleInput = document.getElementById("scheduleTitleInput");
+  const title = titleInput.value.trim();
+  if (!time || !title) return;
+  const item = { day, time, title };
+  try {
+    const res = await fbPost(`families/${FAMILY_ID}/children/${activeId}/schedule`, item);
+    state[activeId].schedule.push({ id: res.name, ...item });
+    titleInput.value = "";
+    render();
+  } catch {
+    showError("Không lưu được lịch — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function deleteScheduleItem(id) {
+  state[activeId].schedule = state[activeId].schedule.filter(s => s.id !== id);
+  render();
+  try { await fbDelete(`families/${FAMILY_ID}/children/${activeId}/schedule/${id}`); }
+  catch { showError("Không xoá được mục lịch — kiểm tra kết nối Firebase."); }
+}
+
+function addCustomApp() {
+  const input = document.getElementById("customAppInput");
+  const pkg = input.value.trim();
+  if (!pkg) return;
+  input.value = "";
+  if (!state[activeId].blockedApps.includes(pkg)) toggleBlockedApp(pkg);
+}
+
+async function saveAppLimits() {
+  const rows = document.querySelectorAll(".limit-input-field");
+  const newLimits = {};
+  rows.forEach(inp => {
+    const pkg = inp.dataset.pkg;
+    const val = parseInt(inp.value, 10);
+    if (!isNaN(val) && val > 0) newLimits[pkg] = val;
+  });
+  state[activeId].appLimits = newLimits;
+  render();
+  const arr = Object.entries(newLimits).map(([pkg, limitMinutes]) => ({ pkg, limitMinutes }));
+  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/appLimits`, arr); }
+  catch { showError("Không lưu được giới hạn theo app — kiểm tra kết nối Firebase."); }
+}
+
+function render() {
+  document.getElementById("pendingDeviceBanner").innerHTML = pendingDevices.map(d => `
+    <div class="pairing-banner">
+      <div class="pairing-banner-text">📱 Thiết bị mới xin ghép nối: ${d.childName}${d.childGrade ? " (" + d.childGrade + ")" : ""}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="pill-btn" onclick="approveDevice('${d.deviceUid}', '${d.childName.replace(/'/g,"\\'")}', '${(d.childGrade||"").replace(/'/g,"\\'")}')">Duyệt</button>
+        <button class="app-block-btn" onclick="rejectDevice('${d.deviceUid}')">Từ chối</button>
+      </div>
+    </div>
+  `).join("");
+
+  document.getElementById("kidSelector").innerHTML = childrenMeta.map(c => {
+    const cs = state[c.id];
+    const online = cs.lastSeen && (Date.now() - cs.lastSeen) < ONLINE_THRESHOLD_MS;
+    const statusText = cs.lastSeen
+      ? (online ? "Đang online" : "Offline · " + timeAgo(cs.lastSeen))
+      : "Chưa có tín hiệu";
+    return `
+    <button class="kid-btn ${c.id===activeId?'active':''}"
+      style="border-color:${c.id===activeId ? c.color : 'transparent'}"
+      onclick="selectKid('${c.id}')">
+      <span class="avatar" style="background:${c.bg};color:${c.color}">${c.name[0]}</span>
+      <span>
+        <div class="kid-name">${c.name}</div>
+        <div class="kid-grade">${c.grade}</div>
+        <div class="status-line" style="color:${online ? '#2F9E8F' : '#B0BAC2'}">
+          <span class="status-dot" style="background:${online ? '#2F9E8F' : '#B0BAC2'}"></span>${statusText}
+        </div>
+      </span>
+    </button>
+  `;
+  }).join("");
+
+  document.getElementById("noChildrenMsg").style.display = childrenMeta.length ? "none" : "block";
+  if (!activeId) {
+    document.getElementById("childDetailSections").style.display = "none";
+    return;
+  }
+  document.getElementById("childDetailSections").style.display = "block";
+
+  const meta = childrenMeta.find(c => c.id === activeId);
+  const s = state[activeId];
+
+  // usage (giới hạn hiệu lực = giới hạn gốc + giờ được thưởng hôm nay)
+  const effectiveLimit = s.dailyLimit + (s.bonusMinutesToday || 0);
+  document.getElementById("usedToday").textContent = s.usedToday;
+  document.getElementById("limitLine").textContent = s.bonusMinutesToday > 0
+    ? `/ ${effectiveLimit} phút (gồm +${s.bonusMinutesToday}p thưởng)`
+    : `/ ${effectiveLimit} phút`;
+  const pct = Math.min((s.usedToday / effectiveLimit) * 100, 100);
+  const bar = document.getElementById("usageBar");
+  bar.style.width = pct + "%";
+  bar.style.background = pct > 90 ? "#FF7A59" : meta.color;
+  document.getElementById("remainLine").textContent = `Còn lại ${Math.max(effectiveLimit - s.usedToday,0)} phút hôm nay`;
+
+  // bonus time card
+  document.getElementById("bonusTodayLine").textContent = s.bonusMinutesToday > 0
+    ? `Đã thưởng hôm nay: +${s.bonusMinutesToday} phút`
+    : "Chưa thưởng thêm giờ nào hôm nay";
+
+  // extension request banner
+  const pendingReq = s.extensionRequests.filter(r => r.status === "pending").sort((a,b) => b.timestamp - a.timestamp)[0];
+  document.getElementById("extensionRequestBanner").innerHTML = pendingReq ? `
+    <div class="extension-banner">
+      <div class="extension-banner-text">🙋 ${meta.name} xin thêm giờ lúc ${timeAgo(pendingReq.timestamp)}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="pill-btn" onclick="grantBonusMinutes(15)">Cho +15 phút</button>
+        <button class="pill-btn" onclick="grantBonusMinutes(30)">Cho +30 phút</button>
+        <button class="app-block-btn" onclick="dismissExtensionRequests()">Bỏ qua</button>
+      </div>
+    </div>
+  ` : "";
+
+  // points
+  document.getElementById("points").textContent = s.points;
+
+  // device info
+  const dev = s.device;
+  document.getElementById("deviceInfo").innerHTML = dev ? `
+    <div class="device-info-grid">
+      <div class="device-info-item">
+        <div class="device-info-label">Thiết bị</div>
+        <div class="device-info-value">${dev.model || "—"}</div>
+        <div class="muted">${dev.androidVersion || ""}</div>
+      </div>
+      <div class="device-info-item">
+        <div class="device-info-label">Pin</div>
+        <div class="device-info-value" style="color:${dev.batteryPercent >= 0 && dev.batteryPercent < 20 ? '#B5502F' : '#1C3D4E'}">
+          ${dev.batteryPercent >= 0 ? dev.batteryPercent + "%" : "—"}
+        </div>
+      </div>
+      <div class="device-storage">
+        <div class="device-info-label">Bộ nhớ đã dùng</div>
+        <div class="device-info-value">
+          ${dev.storageUsedGB != null ? dev.storageUsedGB.toFixed(1) : "?"} / ${dev.storageTotalGB != null ? dev.storageTotalGB.toFixed(1) : "?"} GB
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${dev.storageTotalGB ? Math.min(dev.storageUsedGB / dev.storageTotalGB * 100, 100) : 0}%; background:#6C8EBF"></div>
+        </div>
+      </div>
+    </div>
+  ` : `<div class="muted">Chưa có dữ liệu thiết bị — đợi máy con hoạt động vài phút rồi refresh lại.</div>`;
+
+  // current app
+  const ca = s.currentApp;
+  const caLive = ca && ca.timestamp && (Date.now() - ca.timestamp) < ONLINE_THRESHOLD_MS;
+  document.getElementById("currentAppInfo").innerHTML = caLive
+    ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap">
+         <div>
+           <div style="font-weight:700; font-size:16px; color:#1C3D4E">${prettyFromDotted(ca.packageName)}</div>
+           <div class="muted">Cập nhật ${timeAgo(ca.timestamp)}</div>
          </div>
-     </div>
-    <div id="errBox"></div>
-    <div id="pendingDeviceBanner"></div>
-  
-    <div class="kids" id="kidSelector"></div>
-    <div class="muted" id="noChildrenMsg" style="display:none; margin:20px 0">
-        Chưa có bé nào ghép nối. Đưa Mã gia đình ở trên cho bé nhập vào app Sổ Bé Ngoan trên điện thoại của bé.
-    </div>
-  
-    <div id="childSections"></div>
-  
-    <div id="childDetailSections">
-      <div id="extensionRequestBanner"></div>
-    
-      <div class="grid two">
-          <div class="card">
-                <div class="card-title">⏱ Thời gian dùng máy hôm nay</div>
-                <div class="big-num" id="usedToday">0</div>
-                <div class="muted" id="limitLine"></div>
-                <div class="bar-bg"><div class="bar-fill" id="usageBar"></div></div>
-                <div class="muted" id="remainLine"></div>
-          </div>
-          <div class="card">
-                <div class="card-title">⭐ Điểm thưởng</div>
-                <div class="big-num" id="points" style="color:#2F9E8F">0</div>
-                <div style="margin-top:10px">
-                        <button class="pill-btn" onclick="awardPoints(10)">+10</button>
-                        <button class="pill-btn" onclick="awardPoints(20)">+20</button>
-                        <button class="pill-btn" onclick="awardPoints(50)">+50</button>
-                </div>
-          </div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">🎁 Thưởng thêm thời gian chơi</div>
-          <div class="muted" id="bonusTodayLine" style="margin-bottom:10px"></div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap">
-                <button class="pill-btn" onclick="grantBonusMinutes(10)">+10 phút</button>
-                <button class="pill-btn" onclick="grantBonusMinutes(15)">+15 phút</button>
-                <button class="pill-btn" onclick="grantBonusMinutes(30)">+30 phút</button>
-          </div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">📱 Thông tin thiết bị</div>
-          <div id="deviceInfo"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">🟢 Đang dùng ứng dụng</div>
-          <div id="currentAppInfo"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">📸 Chụp màn hình</div>
-          <button class="save-btn" id="requestScreenshotBtn" style="background:#6C8EBF">Chụp màn hình ngay</button>
-          <div id="screenshotInfo" style="margin-top:12px"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">📍 Vị trí gần nhất</div>
-          <div class="toggle-row">
-                <button class="toggle-switch" id="locationToggle" onclick="toggleLocationEnabled()"></button>
-                <span class="muted">Bật định vị (cập nhật tối đa mỗi 5 phút)</span>
-          </div>
-          <div id="locationInfo"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">📱 Ứng dụng dùng nhiều nhất</div>
-          <div id="appList"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px" id="alertsCard">
-          <div class="card-title">⚠️ Thông báo gần đây</div>
-          <div id="alertList"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">🔒 Giới hạn & chặn ứng dụng</div>
-          <div class="muted" style="margin-bottom:10px">Giới hạn thời gian dùng máy mỗi ngày (phút)</div>
-          <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap">
-                <input type="number" id="limitInput" class="msg-input" style="max-width:100px; flex:none" min="0" step="5" />
-                <span class="muted">phút / ngày</span>
-                <button class="save-btn" id="saveLimitBtn" style="background:#2F9E8F">Lưu</button>
-          </div>
-          <div class="muted" style="margin-bottom:8px">Bấm để chặn/bỏ chặn ứng dụng</div>
-          <div id="blockedAppChips"></div>
-          <div style="display:flex; gap:8px; margin-top:10px">
-                <input class="msg-input" id="customAppInput" placeholder="Tên gói khác, ví dụ: com.example.app" />
-                <button class="save-btn" id="addCustomAppBtn" style="background:#5B7280">Thêm</button>
-          </div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">⏳ Giới hạn phút/ngày cho từng ứng dụng</div>
-          <div class="muted" style="margin-bottom:10px">
-                Để trống hoặc 0 = không giới hạn riêng (vẫn theo tổng giờ/ngày ở trên)
-          </div>
-          <div id="appLimitRows"></div>
-          <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">📅 Thời khóa biểu & sinh hoạt</div>
-          <div class="schedule-form">
-                <select id="scheduleDayInput">
-                        <option value="daily">Hằng ngày</option>
-                        <option value="T2">Thứ 2</option>
-                        <option value="T3">Thứ 3</option>
-                        <option value="T4">Thứ 4</option>
-                        <option value="T5">Thứ 5</option>
-                        <option value="T6">Thứ 6</option>
-                        <option value="T7">Thứ 7</option>
-                        <option value="CN">Chủ nhật</option>
-                </select>
-                <input type="time" id="scheduleTimeInput" value="18:00" />
-                <input class="msg-input" id="scheduleTitleInput" placeholder="Tên hoạt động, vd: Học bài" style="flex:1; min-width:160px" />
-                <button class="save-btn" id="addScheduleBtn" style="background:#2F9E8F">Thêm</button>
-          </div>
-          <div id="scheduleTabs" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px"></div>
-          <div id="scheduleList"></div>
-      </div>
-    
-      <div class="card" style="margin-top:16px">
-          <div class="card-title">💬 Nhắn tin</div>
-          <div class="msg-list" id="msgList"></div>
-          <div class="msg-input-row">
-                <input class="msg-input" id="msgInput" placeholder="Nhắn điều gì đó tích cực..." />
-                <button class="send-btn" id="sendBtn">➤</button>
-          </div>
-      </div>
-    </div>
-  </div>
- 
- <script>
-  const FIREBASE_URL = "https://family-connect-694a7-default-rtdb.asia-southeast1.firebasedatabase.app";
-  // ⚠️ Lấy ở Firebase Console > Project Settings (biểu tượng bánh răng) > General > "Web API Key"
-  const FIREBASE_API_KEY = "AIzaSyAmeZjEYX7arEzphoZo0OCuURWhgAz9gBI";
-  const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
-
-  let FAMILY_ID = null; // được gán sau khi đăng nhập/đăng ký thành công
-
-  const CHILD_COLORS = [
-   { color: "#F2A93B", bg: "#FCEBCB" },
-   { color: "#6C8EBF", bg: "#E1E9F5" },
-   { color: "#2F9E8F", bg: "#DFF3EF" },
-   { color: "#B5502F", bg: "#FBE3DA" },
-   { color: "#8E6CBF", bg: "#EDE3F5" },
-   ];
-  const PRESET_APPS = [
-   { name: "YouTube", pkg: "com.google.android.youtube" },
-   { name: "TikTok", pkg: "com.zhiliaoapp.musically" },
-   { name: "Facebook", pkg: "com.facebook.katana" },
-   { name: "Messenger", pkg: "com.facebook.orca" },
-   { name: "Instagram", pkg: "com.instagram.android" },
-   { name: "Zalo", pkg: "com.zing.zalo" },
-   { name: "Chrome", pkg: "com.android.chrome" },
-   { name: "CH Play", pkg: "com.android.vending" },
-   ];
-
-  let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
-  let activeId = null;
-  let pendingDevices = []; // thiết bị đang xin ghép nối, chờ phụ huynh Duyệt
-  let state = {}; // { childId: { ..., device, location, locationEnabled } }
-
-  function slugifyName(name) {
-     const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-     return normalized.toLowerCase()
-       .replace(/đ/g, "d")
-       .replace(/[^a-z0-9]+/g, "_")
-       .replace(/^_+|_+$/g, "") || "be";
-  }
-
-  function todayDayCode() {
-     const map = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"]; // Date.getDay(): 0=CN..6=T7
-     return map[new Date().getDay()];
-  }
-  let selectedScheduleDay = todayDayCode();
-  function selectScheduleDay(day) { selectedScheduleDay = day; render(); }
-
-  function defaultChildState() {
-     return {
-          dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
-          blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
-          location: null, locationEnabled: false, schedule: [], currentApp: null,
-          bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null
-     };
-  }
-
-  function todayKey() {
-     const d = new Date();
-     return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-  }
-
-  const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 phút không có tín hiệu mới = Offline
-
-  function formatAlertTime(ts) {
-     const d = new Date(ts);
-     const isToday = todayKey() === (d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"));
-     const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-     if (isToday) return time;
-     return d.toLocaleDateString("vi-VN") + " " + time;
-  }
-
-  function timeAgo(ts) {
-     const diffMin = Math.floor((Date.now() - ts) / 60000);
-     if (diffMin < 1) return "vừa xong";
-     if (diffMin < 60) return diffMin + " phút trước";
-     const diffHr = Math.floor(diffMin / 60);
-     if (diffHr < 24) return diffHr + " giờ trước";
-     return Math.floor(diffHr / 24) + " ngày trước";
-  }
-
-  function showError(msg) {
-     document.getElementById("errBox").innerHTML = msg ? `<div class="err">${msg}</div>` : "";
-  }
-
-  // ---------- Đính kèm token đăng nhập vào mọi request, tự làm mới khi hết hạn ----------
-  let authTokens = null; // { idToken, refreshToken, expiresAt }
-
-  async function getValidIdToken() {
-     if (!authTokens) return null;
-     if (Date.now() < authTokens.expiresAt - 60000) return authTokens.idToken; // còn hạn (chừa 1 phút)
-     try {
-          const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
-                 method: "POST",
-                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                 body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(authTokens.refreshToken)}`
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error("refresh failed");
-          authTokens = {
-                 idToken: data.id_token,
-                 refreshToken: data.refresh_token,
-                 expiresAt: Date.now() + Number(data.expires_in) * 1000
-          };
-          persistSession();
-          return authTokens.idToken;
-     } catch (e) {
-          return authTokens.idToken; // thử dùng token cũ, thà lỗi rõ ràng còn hơn kẹt cứng
-     }
-  }
-
-  async function authQueryParam() {
-     const token = await getValidIdToken();
-     return token ? `?auth=${token}` : "";
-  }
-
-  async function fbGet(path) {
-     const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`);
-     if (!res.ok) throw new Error("GET failed " + res.status);
-     return res.json();
-  }
-  async function fbPut(path, value) {
-     const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
-          method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
-     });
-     if (!res.ok) throw new Error("PUT failed " + res.status);
-     return res.json();
-  }
-  async function fbPost(path, value) {
-     const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, {
-          method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(value)
-     });
-     if (!res.ok) throw new Error("POST failed " + res.status);
-     return res.json();
-  }
-  async function fbDelete(path) {
-     const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`, { method: "DELETE" });
-     if (!res.ok) throw new Error("DELETE failed " + res.status);
-     return res.json();
-  }
-
-  function prettyAppName(key) {
-     const pkg = key.replace(/_/g, ".");
-     return prettyFromDotted(pkg);
-  }
-  function prettyFromDotted(pkg) {
-     const last = pkg.split(".").pop() || pkg;
-     return last.charAt(0).toUpperCase() + last.slice(1);
-  }
-
-  async function refreshChild(meta) {
-     try {
-          const data = await fbGet(`families/${FAMILY_ID}/children/${meta.id}`);
-          showError(null);
-          const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
-          const apps = Object.entries(usageToday)
-            .map(([key, minutes]) => ({ name: prettyAppName(key), pkg: key.replace(/_/g, "."), minutes: Number(minutes) }))
-            .filter(a => a.minutes > 0)
-            .sort((a,b) => b.minutes - a.minutes).slice(0,15);
-          const usageMap = {};
-          Object.entries(usageToday).forEach(([key, minutes]) => {
-                 usageMap[key.replace(/_/g, ".")] = Number(minutes);
-          });
-          const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
-          const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
-          const alerts = data && data.alerts
-            ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
-                       label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
-                                       : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
-                                       : a.type === "APP_LIMIT" ? `Đã hết giờ riêng cho: ${prettyFromDotted(a.packageName)}`
-                                       : a.type === "ADMIN_DISABLED" ? "Cảnh báo: quyền quản trị thiết bị bị tắt"
-                                       : "Cảnh báo",
-                       time: formatAlertTime(a.timestamp)
-            }))
-                 : [];
-          const appLimitsArr = (data && data.rules && data.rules.appLimits) || [];
-          const appLimits = {};
-          appLimitsArr.forEach(entry => { if (entry && entry.pkg) appLimits[entry.pkg] = entry.limitMinutes; });
-          state[meta.id] = {
-                 dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
-                 usedToday, points: (data && data.rewards && data.rewards.points) || 0,
-                 apps, alerts, messages,
-                 blockedApps: (data && data.rules && data.rules.blockedApps) || [],
-                 lastSeen: (data && data.status && data.status.lastSeen) || null,
-                 appLimits, usageMap,
-                 device: (data && data.device) || null,
-                 location: (data && data.location) || null,
-                 locationEnabled: (data && data.rules && data.rules.locationEnabled) || false,
-                 schedule: data && data.schedule
-                          ? Object.entries(data.schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
-                          : [],
-                 currentApp: (data && data.status && data.status.currentApp) || null,
-                 bonusMinutesToday: (data && data.rules && data.rules.bonusMinutes && data.rules.bonusMinutes[todayKey()]) || 0,
-                 extensionRequests: data && data.extensionRequests
-                          ? Object.entries(data.extensionRequests).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
-                          : [],
-                 screenshot: (data && data.screenshot) || null,
-                 screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
-          };
-          render();
-     } catch (e) {
-          showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
-     }
-  }
-
-  async function sendMessage() {
-     const input = document.getElementById("msgInput");
-     const text = input.value.trim();
-     if (!text) return;
-     const msg = { from: "parent", text, timestamp: Date.now() };
-     state[activeId].messages.push(msg);
-     input.value = "";
-     render();
-     try { await fbPost(`families/${FAMILY_ID}/children/${activeId}/messages`, msg); }
-     catch { showError("Không gửi được tin nhắn — kiểm tra kết nối Firebase."); }
-  }
-
-  async function awardPoints(amount) {
-     const newTotal = state[activeId].points + amount;
-     state[activeId].points = newTotal;
-     render();
-     try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rewards/points`, newTotal); }
-     catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
-  }
-
-  async function clearPendingExtensionRequests() {
-     const reqs = state[activeId].extensionRequests.filter(r => r.status === "pending");
-     for (const r of reqs) {
-          try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/extensionRequests/${r.id}/status`, "handled"); }
-          catch { /* bỏ qua, không quan trọng bằng việc đã thưởng giờ */ }
-     }
-     state[activeId].extensionRequests = state[activeId].extensionRequests.map(r =>
-          r.status === "pending" ? { ...r, status: "handled" } : r
-                                                                                 );
-  }
-
-  async function grantBonusMinutes(minutes) {
-     const today = todayKey();
-     const newBonus = (state[activeId].bonusMinutesToday || 0) + minutes;
-     state[activeId].bonusMinutesToday = newBonus;
-     render();
-     try {
-          await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/bonusMinutes/${today}`, newBonus);
-          await fbPost(`families/${FAMILY_ID}/children/${activeId}/rewardEvents`, { minutes, timestamp: { ".sv": "timestamp" } });
-          await clearPendingExtensionRequests();
-          render();
-     } catch {
-          showError("Không thưởng được thời gian — kiểm tra kết nối Firebase.");
-     }
-  }
-
-  async function dismissExtensionRequests() {
-     await clearPendingExtensionRequests();
-     render();
-  }
-
-  async function requestScreenshot() {
-     state[activeId].screenshotRequestedAt = "pending";
-     render();
-     try {
-          const resolved = await fbPut(
-                 `families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`,
-           { ".sv": "timestamp" }
-               );
-          state[activeId].screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
-     } catch {
-          state[activeId].screenshotRequestedAt = null;
-          showError("Không gửi được yêu cầu chụp màn hình — kiểm tra kết nối Firebase.");
-     }
-     render();
-  }
-
-  async function saveDailyLimit() {
-     const input = document.getElementById("limitInput");
-     const val = parseInt(input.value, 10);
-     if (isNaN(val) || val < 0) return;
-     state[activeId].dailyLimit = val;
-     render();
-     try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/dailyLimitMinutes`, val); }
-     catch { showError("Không lưu được giới hạn giờ — kiểm tra kết nối Firebase."); }
-  }
-
-  async function toggleBlockedApp(pkg) {
-     const list = state[activeId].blockedApps.slice();
-     const idx = list.indexOf(pkg);
-     if (idx >= 0) list.splice(idx, 1); else list.push(pkg);
-     state[activeId].blockedApps = list;
-     render();
-     try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/blockedApps`, list); }
-     catch { showError("Không lưu được danh sách chặn — kiểm tra kết nối Firebase."); }
-  }
-
-  async function toggleLocationEnabled() {
-     const newVal = !state[activeId].locationEnabled;
-     state[activeId].locationEnabled = newVal;
-     render();
-     try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/locationEnabled`, newVal); }
-     catch { showError("Không lưu được cài đặt định vị — kiểm tra kết nối Firebase."); }
-  }
-
-  async function addScheduleItem() {
-     const day = document.getElementById("scheduleDayInput").value;
-     const time = document.getElementById("scheduleTimeInput").value;
-     const titleInput = document.getElementById("scheduleTitleInput");
-     const title = titleInput.value.trim();
-     if (!time || !title) return;
-     const item = { day, time, title };
-     try {
-          const res = await fbPost(`families/${FAMILY_ID}/children/${activeId}/schedule`, item);
-          state[activeId].schedule.push({ id: res.name, ...item });
-          titleInput.value = "";
-          render();
-     } catch {
-          showError("Không lưu được lịch — kiểm tra kết nối Firebase.");
-     }
-  }
-
-  async function deleteScheduleItem(id) {
-     state[activeId].schedule = state[activeId].schedule.filter(s => s.id !== id);
-     render();
-     try { await fbDelete(`families/${FAMILY_ID}/children/${activeId}/schedule/${id}`); }
-     catch { showError("Không xoá được mục lịch — kiểm tra kết nối Firebase."); }
-  }
-
-  function addCustomApp() {
-     const input = document.getElementById("customAppInput");
-     const pkg = input.value.trim();
-     if (!pkg) return;
-     input.value = "";
-     if (!state[activeId].blockedApps.includes(pkg)) toggleBlockedApp(pkg);
-  }
-
-  async function saveAppLimits() {
-     const rows = document.querySelectorAll(".limit-input-field");
-     const newLimits = {};
-     rows.forEach(inp => {
-          const pkg = inp.dataset.pkg;
-          const val = parseInt(inp.value, 10);
-          if (!isNaN(val) && val > 0) newLimits[pkg] = val;
-     });
-     state[activeId].appLimits = newLimits;
-     render();
-     const arr = Object.entries(newLimits).map(([pkg, limitMinutes]) => ({ pkg, limitMinutes }));
-     try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/appLimits`, arr); }
-     catch { showError("Không lưu được giới hạn theo app — kiểm tra kết nối Firebase."); }
-  }
-
-  function render() {
-     document.getElementById("pendingDeviceBanner").innerHTML = pendingDevices.map(d => `
-         <div class="pairing-banner">
-               <div class="pairing-banner-text">📱 Thiết bị mới xin ghép nối: ${d.childName}${d.childGrade ? " (" + d.childGrade + ")" : ""}</div>
-                     <div style="display:flex; gap:8px; flex-wrap:wrap">
-                             <button class="pill-btn" onclick="approveDevice('${d.deviceUid}', '${d.childName.replace(/'/g,"\\'")}', '${(d.childGrade||"").replace(/'/g,"\\'")}')">Duyệt</button>
-                                     <button class="app-block-btn" onclick="rejectDevice('${d.deviceUid}')">Từ chối</button>
-                                           </div>
-                                               </div>
-                                                 `).join("");
-
-     document.getElementById("kidSelector").innerHTML = childrenMeta.map(c => {
-          const cs = state[c.id];
-          const online = cs.lastSeen && (Date.now() - cs.lastSeen) < ONLINE_THRESHOLD_MS;
-          const statusText = cs.lastSeen
-            ? (online ? "Đang online" : "Offline · " + timeAgo(cs.lastSeen))
-                 : "Chưa có tín hiệu";
-          return `
-              <button class="kid-btn ${c.id===activeId?'active':''}"
-                    style="border-color:${c.id===activeId ? c.color : 'transparent'}"
-                          onclick="selectKid('${c.id}')">
-                                <span class="avatar" style="background:${c.bg};color:${c.color}">${c.name[0]}</span>
-                                      <span>
-                                              <div class="kid-name">${c.name}</div>
-                                                      <div class="kid-grade">${c.grade}</div>
-                                                              <div class="status-line" style="color:${online ? '#2F9E8F' : '#B0BAC2'}">
-                                                                        <span class="status-dot" style="background:${online ? '#2F9E8F' : '#B0BAC2'}"></span>${statusText}
-                                                                                </div>
-                                                                                      </span>
-                                                                                          </button>
-                                                                                            `;
-     }).join("");
-
-     document.getElementById("noChildrenMsg").style.display = childrenMeta.length ? "none" : "block";
-     if (!activeId) {
-          document.getElementById("childDetailSections").style.display = "none";
-          return;
-     }
-     document.getElementById("childDetailSections").style.display = "block";
-
-     const meta = childrenMeta.find(c => c.id === activeId);
-     const s = state[activeId];
-
-     // usage (giới hạn hiệu lực = giới hạn gốc + giờ được thưởng hôm nay)
-     const effectiveLimit = s.dailyLimit + (s.bonusMinutesToday || 0);
-     document.getElementById("usedToday").textContent = s.usedToday;
-     document.getElementById("limitLine").textContent = s.bonusMinutesToday > 0
-       ? `/ ${effectiveLimit} phút (gồm +${s.bonusMinutesToday}p thưởng)`
-          : `/ ${effectiveLimit} phút`;
-     const pct = Math.min((s.usedToday / effectiveLimit) * 100, 100);
-     const bar = document.getElementById("usageBar");
-     bar.style.width = pct + "%";
-     bar.style.background = pct > 90 ? "#FF7A59" : meta.color;
-     document.getElementById("remainLine").textContent = `Còn lại ${Math.max(effectiveLimit - s.usedToday,0)} phút hôm nay`;
-
-     // bonus time card
-     document.getElementById("bonusTodayLine").textContent = s.bonusMinutesToday > 0
-       ? `Đã thưởng hôm nay: +${s.bonusMinutesToday} phút`
-          : "Chưa thưởng thêm giờ nào hôm nay";
-
-     // extension request banner
-     const pendingReq = s.extensionRequests.filter(r => r.status === "pending").sort((a,b) => b.timestamp - a.timestamp)[0];
-     document.getElementById("extensionRequestBanner").innerHTML = pendingReq ? `
-         <div class="extension-banner">
-               <div class="extension-banner-text">🙋 ${meta.name} xin thêm giờ lúc ${timeAgo(pendingReq.timestamp)}</div>
-                     <div style="display:flex; gap:8px; flex-wrap:wrap">
-                             <button class="pill-btn" onclick="grantBonusMinutes(15)">Cho +15 phút</button>
-                                     <button class="pill-btn" onclick="grantBonusMinutes(30)">Cho +30 phút</button>
-                                             <button class="app-block-btn" onclick="dismissExtensionRequests()">Bỏ qua</button>
-                                                   </div>
-                                                       </div>
-                                                         ` : "";
-
-     // points
-     document.getElementById("points").textContent = s.points;
-
-     // device info
-     const dev = s.device;
-     document.getElementById("deviceInfo").innerHTML = dev ? `
-         <div class="device-info-grid">
-               <div class="device-info-item">
-                       <div class="device-info-label">Thiết bị</div>
-                               <div class="device-info-value">${dev.model || "—"}</div>
-                                       <div class="muted">${dev.androidVersion || ""}</div>
-                                             </div>
-                                                   <div class="device-info-item">
-                                                           <div class="device-info-label">Pin</div>
-                                                                   <div class="device-info-value" style="color:${dev.batteryPercent >= 0 && dev.batteryPercent < 20 ? '#B5502F' : '#1C3D4E'}">
-                                                                             ${dev.batteryPercent >= 0 ? dev.batteryPercent + "%" : "—"}
-                                                                                     </div>
-                                                                                           </div>
-                                                                                                 <div class="device-storage">
-                                                                                                         <div class="device-info-label">Bộ nhớ đã dùng</div>
-                                                                                                                 <div class="device-info-value">
-                                                                                                                           ${dev.storageUsedGB != null ? dev.storageUsedGB.toFixed(1) : "?"} / ${dev.storageTotalGB != null ? dev.storageTotalGB.toFixed(1) : "?"} GB
-                                                                                                                                   </div>
-                                                                                                                                           <div class="bar-bg">
-                                                                                                                                                     <div class="bar-fill" style="width:${dev.storageTotalGB ? Math.min(dev.storageUsedGB / dev.storageTotalGB * 100, 100) : 0}%; background:#6C8EBF"></div>
-                                                                                                                                                             </div>
-                                                                                                                                                                   </div>
-                                                                                                                                                                       </div>
-                                                                                                                                                                         ` : `<div class="muted">Chưa có dữ liệu thiết bị — đợi máy con hoạt động vài phút rồi refresh lại.</div>`;
-
-     // current app
-     const ca = s.currentApp;
-     const caLive = ca && ca.timestamp && (Date.now() - ca.timestamp) < ONLINE_THRESHOLD_MS;
-     document.getElementById("currentAppInfo").innerHTML = caLive
-       ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap">
-                <div>
-                           <div style="font-weight:700; font-size:16px; color:#1C3D4E">${prettyFromDotted(ca.packageName)}</div>
-                                      <div class="muted">Cập nhật ${timeAgo(ca.timestamp)}</div>
-                                               </div>
-                                                        <button class="app-block-btn ${s.blockedApps.includes(ca.packageName) ? 'blocked' : ''}" onclick="toggleBlockedApp('${ca.packageName}')">
-                                                                   ${s.blockedApps.includes(ca.packageName) ? '✕ Đã chặn' : 'Chặn ứng dụng này'}
-                                                                            </button>
-                                                                                   </div>`
-          : `<div class="muted">Không có dữ liệu gần đây (máy có thể đang tắt màn hình hoặc offline).</div>`;
-
-     // screenshot
-     const shot = s.screenshot;
-     const reqAt = s.screenshotRequestedAt;
-     const scBtn = document.getElementById("requestScreenshotBtn");
-     const waitingForFresh = reqAt && (reqAt === "pending" || !shot || shot.timestamp < reqAt);
-     scBtn.disabled = !!waitingForFresh;
-     scBtn.textContent = waitingForFresh ? "Đang chờ máy con chụp..." : "Chụp màn hình ngay";
-     if (waitingForFresh) {
-          document.getElementById("screenshotInfo").innerHTML =
-                 `<div class="muted">Đã gửi yêu cầu — máy con cần đang mở màn hình và có mạng để chụp được. Có thể mất khoảng 1 phút.</div>`;
-     } else if (shot) {
-          document.getElementById("screenshotInfo").innerHTML = `
-                <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" />
-                      <div class="muted" style="margin-top:6px">Chụp lúc: ${timeAgo(shot.timestamp)}</div>
-                          `;
-     } else {
-          document.getElementById("screenshotInfo").innerHTML =
-                 `<div class="muted">Chưa có ảnh nào — bấm nút phía trên để yêu cầu chụp.</div>`;
-     }
-
-     // location
-     const toggle = document.getElementById("locationToggle");
-     if (s.locationEnabled) toggle.classList.add("on"); else toggle.classList.remove("on");
-
-     const loc = s.location;
-     if (!s.locationEnabled) {
-          document.getElementById("locationInfo").innerHTML =
-                 `<div class="muted">Định vị đang tắt. Bật công tắc ở trên để bắt đầu xem vị trí.</div>`;
-     } else if (loc) {
-          document.getElementById("locationInfo").innerHTML = `
-                <div class="muted" style="margin-bottom:6px">Cập nhật: ${timeAgo(loc.timestamp)}</div>
-                      <iframe class="location-map" loading="lazy"
-                              src="https://www.openstreetmap.org/export/embed.html?bbox=${loc.lng-0.01}%2C${loc.lat-0.01}%2C${loc.lng+0.01}%2C${loc.lat+0.01}&layer=mapnik&marker=${loc.lat}%2C${loc.lng}">
-                                    </iframe>
-                                          <div style="margin-top:8px">
-                                                  <a class="location-link" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener">Mở trong Google Maps →</a>
-                                                        </div>
-                                                            `;
-     } else {
-          document.getElementById("locationInfo").innerHTML =
-                 `<div class="muted">Đã bật định vị — đang đợi máy con gửi vị trí đầu tiên (có thể mất vài phút).</div>`;
-     }
-
-     // schedule — hiện dạng tab theo từng thứ, mặc định chọn đúng hôm nay
-     const dayTabs = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-     const dayLabels = { T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
-     const today = todayDayCode();
-
-     document.getElementById("scheduleTabs").innerHTML = dayTabs.map(day => `
-         <button class="schedule-day-tab ${day===selectedScheduleDay ? 'active' : ''} ${day===today ? 'today' : ''}"
-               onclick="selectScheduleDay('${day}')">${dayLabels[day]}${day===today ? ' • Hôm nay' : ''}</button>
-                 `).join("");
-
-     const itemsForSelectedDay = s.schedule
-       .filter(it => it.day === selectedScheduleDay || it.day === "daily")
-       .sort((a,b) => a.time.localeCompare(b.time));
-
-     let currentIdx = -1;
-     if (selectedScheduleDay === today) {
-          const nowStr = String(new Date().getHours()).padStart(2,"0") + ":" + String(new Date().getMinutes()).padStart(2,"0");
-          itemsForSelectedDay.forEach((it, i) => { if (it.time <= nowStr) currentIdx = i; });
-     }
-
-     document.getElementById("scheduleList").innerHTML = itemsForSelectedDay.length
-       ? itemsForSelectedDay.map((it, i) => `
-               <div class="schedule-item ${i === currentIdx ? 'current' : ''}">
-                         ${i === currentIdx ? '<span class="schedule-now-tag">ĐANG DIỄN RA</span>' : ''}
-                                   <span class="schedule-time">${it.time}</span>
-                                             <span class="schedule-title">${it.title}${it.day === "daily" ? ' <span class="muted" style="display:inline">(hằng ngày)</span>' : ''}</span>
-                                                       <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
-                                                               </div>
-                                                                     `).join("")
-          : `<div class="muted">Chưa có lịch nào cho ${dayLabels[selectedScheduleDay]} — thêm hoạt động ở trên.</div>`;
-
-     // daily limit input (skip overwrite while user is typing)
-     const limitInput = document.getElementById("limitInput");
-     if (document.activeElement !== limitInput) limitInput.value = s.dailyLimit;
-
-     // blocked app chips
-     const customBlocked = s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p));
-     document.getElementById("blockedAppChips").innerHTML =
-          PRESET_APPS.map(a => `
-                <button class="chip-toggle ${s.blockedApps.includes(a.pkg) ? 'active' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${a.name}</button>
-                    `).join("") +
-          customBlocked.map(p => `
-                <button class="chip-toggle active" onclick="toggleBlockedApp('${p}')">${p}</button>
-                    `).join("");
-
-     // per-app minute limits (hiện tất cả app phổ biến + đã có giới hạn riêng + đã bị chặn thủ công)
-     const limitPkgs = PRESET_APPS.map(a => a.pkg)
-       .concat(Object.keys(s.appLimits).filter(p => !PRESET_APPS.some(a => a.pkg === p)))
-       .concat(s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p)))
-       .filter((p, i, arr) => arr.indexOf(p) === i); // bỏ trùng
-     const focusedPkg = document.activeElement && document.activeElement.classList.contains("limit-input-field")
-       ? document.activeElement.dataset.pkg : null;
-     document.getElementById("appLimitRows").innerHTML = limitPkgs.map(pkg => {
-          const preset = PRESET_APPS.find(a => a.pkg === pkg);
-          const name = preset ? preset.name : prettyFromDotted(pkg);
-          const val = s.appLimits[pkg] || "";
-          const used = s.usageMap[pkg] || 0;
-          const limit = s.appLimits[pkg];
-          const isOver = limit && used >= limit;
-          return `
-                <div class="limit-row">
-                        <span class="limit-name">${name}</span>
-                                <span class="limit-used ${isOver ? 'over' : ''}">Đã dùng: ${used}p</span>
-                                        <input type="number" min="0" step="5" class="limit-input-field" data-pkg="${pkg}" value="${val}" />
-                                                <span class="limit-unit">phút/ngày</span>
-                                                      </div>
-                                                          `;
-     }).join("");
-     // giữ nguyên focus + con trỏ nếu người dùng đang gõ dở
-     if (focusedPkg) {
-          const el = document.querySelector(`.limit-input-field[data-pkg="${focusedPkg}"]`);
-          if (el) el.focus();
-     }
-
-     // apps
-     document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => {
-          const isBlocked = s.blockedApps.includes(a.pkg);
-          return `
-              <div class="app-row">
-                    <span class="app-name">${a.name}</span>
-                          <div class="app-bar-bg"><div class="app-bar-fill" style="width:${Math.min(a.minutes*3,100)}%;background:${meta.color};opacity:${1 - i*0.12}"></div></div>
-                                <span>${a.minutes}p</span>
-                                      <button class="app-block-btn ${isBlocked ? 'blocked' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${isBlocked ? '✕ Đã chặn' : 'Chặn'}</button>
-                                          </div>
-                                            `;
-     }).join("") : `<div class="muted">Chưa có dữ liệu hôm nay</div>`;
-
-     // alerts
-     document.getElementById("alertsCard").style.display = s.alerts.length ? "block" : "none";
-     document.getElementById("alertList").innerHTML = s.alerts.map(a => `
-         <div class="alert-item">${a.label} · <span style="color:#B0BAC2">${a.time}</span></div>
-           `).join("");
-
-     // messages
-     document.getElementById("msgList").innerHTML = s.messages.map(m => `
-         <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
-               style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
-                 `).join("");
-  }
-
-  function selectKid(id) { activeId = id; render(); }
-
-  document.getElementById("sendBtn").addEventListener("click", sendMessage);
-  document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
-  document.getElementById("saveLimitBtn").addEventListener("click", saveDailyLimit);
-  document.getElementById("addCustomAppBtn").addEventListener("click", addCustomApp);
-  document.getElementById("customAppInput").addEventListener("keydown", e => { if (e.key === "Enter") addCustomApp(); });
-  document.getElementById("saveAppLimitsBtn").addEventListener("click", saveAppLimits);
-  document.getElementById("addScheduleBtn").addEventListener("click", addScheduleItem);
-  document.getElementById("scheduleTitleInput").addEventListener("keydown", e => { if (e.key === "Enter") addScheduleItem(); });
-  document.getElementById("requestScreenshotBtn").addEventListener("click", requestScreenshot);
-
-  // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
-  async function fetchPendingDevices() {
-     try {
-          const data = await fbGet(`families/${FAMILY_ID}/pendingDevices`);
-          pendingDevices = data
-            ? Object.entries(data).map(([deviceUid, v]) => ({
-                       deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
-            }))
-                 : [];
-     } catch (e) {
-          pendingDevices = [];
-     }
-  }
-
-  async function approveDevice(deviceUid, childName, childGrade) {
-     const childId = slugifyName(childName);
-     try {
-          await fbPut(`families/${FAMILY_ID}/approvedDevices/${deviceUid}`, { childId, approvedAt: { ".sv": "timestamp" } });
-          await fbPut(`families/${FAMILY_ID}/children/${childId}/profile`, { name: childName, grade: childGrade || "" });
-          await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
-          pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
-          render();
-          await refreshAll();
-     } catch {
-          showError("Không duyệt được thiết bị — kiểm tra kết nối Firebase.");
-     }
-  }
-
-  async function rejectDevice(deviceUid) {
-     try {
-          await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
-          pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
-          render();
-     } catch {
-          showError("Không từ chối được yêu cầu — kiểm tra kết nối Firebase.");
-     }
-  }
-
-  async function discoverChildren() {
-     if (!FAMILY_ID) return;
-     try {
-          const childrenData = await fbGet(`families/${FAMILY_ID}/children`);
-          const ids = childrenData ? Object.keys(childrenData) : [];
-          childrenMeta = ids.map((id, i) => {
-                 const profile = (childrenData[id] && childrenData[id].profile) || {};
-                 const c = CHILD_COLORS[i % CHILD_COLORS.length];
-                 return { id, name: profile.name || id, grade: profile.grade || "", color: c.color, bg: c.bg };
-          });
-          childrenMeta.forEach(m => { if (!state[m.id]) state[m.id] = defaultChildState(); });
-          if (!activeId || !childrenMeta.some(m => m.id === activeId)) {
-                 activeId = childrenMeta.length ? childrenMeta[0].id : null;
-          }
-     } catch (e) {
-          showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
-     }
-  }
-
-let refreshInProgress = false;
-  async function refreshAll() {
-     if (refreshInProgress) return; // tránh chồng lệnh khi lần trước chưa xong (gây dồn ứ request)
-     refreshInProgress = true;
-     try {
-          await discoverChildren();
-          await fetchPendingDevices();
-          for (const m of childrenMeta) await refreshChild(m);
-          render();
-     } finally {
-          refreshInProgress = false;
-     }
-  }
-
-  // ---------- Đăng ký / Đăng nhập (dùng thẳng REST API của Firebase Auth, không cần SDK) ----------
-  let authMode = "login";
-  let idType = "phone"; // mặc định đăng ký/đăng nhập bằng số điện thoại
-
-  function getSession() {
-     try { return JSON.parse(localStorage.getItem("fc_session") || "null"); }
-     catch { return null; }
-  }
-  function setSession(session) { localStorage.setItem("fc_session", JSON.stringify(session)); }
-  function clearSession() { localStorage.removeItem("fc_session"); }
-
-  // Lưu lại authTokens mới nhất (sau khi tự làm mới) vào cùng session đã lưu trước đó
-  function persistSession() {
-     const existing = getSession();
-     if (existing) setSession({ ...existing, authTokens });
-  }
-
-  function randomFamilyCode() {
-     const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // bỏ ký tự dễ nhầm 0/O, 1/I
-     let code = "";
-     for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-     return code;
-  }
-
-  // Số điện thoại không xác thực SMS thật (đỡ phải cấu hình reCAPTCHA/SMS trên
-  // Firebase) — dùng số điện thoại làm "tên đăng nhập", quy đổi thành 1 email
-  // giả nội bộ để tận dụng lại Firebase Email/Password Auth có sẵn.
-  // Vẫn bắt buộc đúng cú pháp đầu số di động Việt Nam hiện hành.
-  const VN_PHONE_REGEX = /^0(32|33|34|35|36|37|38|39|86|96|97|98|81|82|83|84|85|88|91|94|70|76|77|78|79|89|90|93|52|56|58|92|59|99|87|55)[0-9]{7}$/;
-
-  function normalizeVNPhone(raw) {
-     let digits = raw.replace(/[^0-9]/g, "");
-     if (digits.length === 11 && digits.startsWith("84")) {
-          digits = "0" + digits.slice(2); // +84912345678 -> 0912345678
-     }
-     return digits;
-  }
-  function phoneToPseudoEmail(phone) {
-     const digits = normalizeVNPhone(phone);
-     return `sdt${digits}@sobengoan.app`;
-  }
-
-  function translateAuthError(code) {
-     if (code === "EMAIL_EXISTS") return idType === "phone" ? "Số điện thoại này đã đăng ký rồi — thử đăng nhập." : "Email này đã đăng ký rồi — thử đăng nhập.";
-     if (code === "EMAIL_NOT_FOUND" || code === "INVALID_PASSWORD" || code === "INVALID_LOGIN_CREDENTIALS")
-          return idType === "phone" ? "Sai số điện thoại hoặc mật khẩu." : "Sai email hoặc mật khẩu.";
-     if (typeof code === "string" && code.startsWith("WEAK_PASSWORD")) return "Mật khẩu quá ngắn (tối thiểu 6 ký tự).";
-     return "Có lỗi xảy ra, thử lại sau." + (code ? " (" + code + ")" : "");
-  }
-
-  function updateIdTypeUI() {
-     const phoneBtn = document.getElementById("idTypePhoneBtn");
-     const emailBtn = document.getElementById("idTypeEmailBtn");
-     const input = document.getElementById("authIdentifier");
-     phoneBtn.classList.toggle("active", idType === "phone");
-     emailBtn.classList.toggle("active", idType === "email");
-     if (idType === "phone") {
-          input.type = "tel";
-          input.placeholder = "Số điện thoại (vd: 0912345678)";
-     } else {
-          input.type = "email";
-          input.placeholder = "Email";
-     }
-     document.getElementById("authError").style.display = "none";
-  }
-  document.getElementById("idTypePhoneBtn").addEventListener("click", () => { idType = "phone"; updateIdTypeUI(); });
-  document.getElementById("idTypeEmailBtn").addEventListener("click", () => { idType = "email"; updateIdTypeUI(); });
-  updateIdTypeUI();
-
-  document.getElementById("authToggleLink").addEventListener("click", (e) => {
-     e.preventDefault();
-     authMode = authMode === "login" ? "register" : "login";
-     document.getElementById("authModeLabel").textContent = authMode === "login" ? "Đăng nhập" : "Đăng ký tài khoản mới";
-     document.getElementById("authSubmitBtn").textContent = authMode === "login" ? "Đăng nhập" : "Đăng ký";
-     document.getElementById("authToggleText").textContent = authMode === "login" ? "Chưa có tài khoản?" : "Đã có tài khoản?";
-     document.getElementById("authToggleLink").textContent = authMode === "login" ? "Đăng ký ngay" : "Đăng nhập";
-     document.getElementById("authError").style.display = "none";
-  });
-
-  document.getElementById("authSubmitBtn").addEventListener("click", handleAuthSubmit);
-  document.getElementById("authPassword").addEventListener("keydown", e => { if (e.key === "Enter") handleAuthSubmit(); });
-
-  async function handleAuthSubmit() {
-     const rawIdentifier = document.getElementById("authIdentifier").value.trim();
-     const password = document.getElementById("authPassword").value;
-     const errBox = document.getElementById("authError");
-     errBox.style.display = "none";
-
-     if (idType === "phone") {
-          const digits = normalizeVNPhone(rawIdentifier);
-          if (!VN_PHONE_REGEX.test(digits)) {
-                 errBox.textContent = "Số điện thoại không đúng định dạng di động Việt Nam (vd: 0912345678).";
-                 errBox.style.display = "block";
-                 return;
-          }
-     } else if (!rawIdentifier.includes("@")) {
-          errBox.textContent = "Nhập email hợp lệ.";
-          errBox.style.display = "block";
-          return;
-     }
-     if (password.length < 6) {
-          errBox.textContent = "Mật khẩu tối thiểu 6 ký tự.";
-          errBox.style.display = "block";
-          return;
-     }
-     if (FIREBASE_API_KEY.includes("DÁN_")) {
-          errBox.textContent = "Chưa cấu hình FIREBASE_API_KEY trong file — xem hướng dẫn kèm theo.";
-          errBox.style.display = "block";
-          return;
-     }
-
-     const authEmail = idType === "phone" ? phoneToPseudoEmail(rawIdentifier) : rawIdentifier;
-     const endpoint = authMode === "login" ? "signInWithPassword" : "signUp";
-     try {
-          const res = await fetch(`${AUTH_BASE}:${endpoint}?key=${FIREBASE_API_KEY}`, {
-                 method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({ email: authEmail, password, returnSecureToken: true })
-          });
-          const data = await res.json();
-          if (!res.ok) {
-                 errBox.textContent = translateAuthError(data.error && data.error.message);
-                 errBox.style.display = "block";
-                 return;
-          }
-          authTokens = {
-                 idToken: data.idToken,
-                 refreshToken: data.refreshToken,
-                 expiresAt: Date.now() + Number(data.expiresIn) * 1000
-          };
-          await onAuthSuccess(data.localId, idType === "phone" ? normalizeVNPhone(rawIdentifier) : rawIdentifier, idType);
-     } catch (e) {
-          errBox.textContent = "Lỗi kết nối, thử lại sau.";
-          errBox.style.display = "block";
-     }
-  }
-
-  async function onAuthSuccess(uid, identifier, kind) {
-     const errBox = document.getElementById("authError");
-     let famId;
-     try {
-          const existing = await fbGet(`users/${uid}/familyId`);
-          if (existing) {
-                 famId = existing;
-                 // Bù lại ownerUid cho tài khoản đã tạo trước khi có luật bảo mật mới
-                 await fbPut(`families/${famId}/meta/ownerUid`, uid).catch(() => {});
-          } else {
-                 famId = randomFamilyCode();
-                 await fbPut(`users/${uid}/familyId`, famId);
-                 const meta = kind === "phone"
-                   ? { ownerUid: uid, ownerPhone: identifier, createdAt: Date.now() }
-                          : { ownerUid: uid, ownerEmail: identifier, createdAt: Date.now() };
-                 await fbPut(`families/${famId}/meta`, meta);
-          }
-     } catch (e) {
-          errBox.textContent = "Đăng nhập thành công nhưng không lấy được Mã gia đình — thử tải lại trang.";
-          errBox.style.display = "block";
-          return;
-     }
-     FAMILY_ID = famId;
-     setSession({ uid, identifier, kind, familyId: famId, authTokens });
-     showDashboard();
-  }
-
-  function showDashboard() {
-     document.getElementById("authScreen").style.display = "none";
-     document.getElementById("dashboardApp").style.display = "block";
-     document.getElementById("familyCodeText").textContent = FAMILY_ID;
-     render();
-     refreshAll();
-     setInterval(refreshAll, 5000);
-     setInterval(render, 15000);
-  }
-
-  document.getElementById("logoutBtn").addEventListener("click", () => {
-     clearSession();
-     location.reload();
-  });
-
-  // ---------- Khởi động ----------
-  const existingSession = getSession();
-  if (existingSession && existingSession.familyId && existingSession.authTokens) {
-     FAMILY_ID = existingSession.familyId;
-     authTokens = existingSession.authTokens;
-     showDashboard();
+         <button class="app-block-btn ${s.blockedApps.includes(ca.packageName) ? 'blocked' : ''}" onclick="toggleBlockedApp('${ca.packageName}')">
+           ${s.blockedApps.includes(ca.packageName) ? '✕ Đã chặn' : 'Chặn ứng dụng này'}
+         </button>
+       </div>`
+    : `<div class="muted">Không có dữ liệu gần đây (máy có thể đang tắt màn hình hoặc offline).</div>`;
+
+  // screenshot
+  const shot = s.screenshot;
+  const reqAt = s.screenshotRequestedAt;
+  const scBtn = document.getElementById("requestScreenshotBtn");
+  const waitingForFresh = reqAt && (reqAt === "pending" || !shot || shot.timestamp < reqAt);
+  scBtn.disabled = !!waitingForFresh;
+  scBtn.textContent = waitingForFresh ? "Đang chờ máy con chụp..." : "Chụp màn hình ngay";
+  if (waitingForFresh) {
+    document.getElementById("screenshotInfo").innerHTML =
+      `<div class="muted">Đã gửi yêu cầu — máy con cần đang mở màn hình và có mạng để chụp được. Có thể mất khoảng 1 phút.</div>`;
+  } else if (shot) {
+    document.getElementById("screenshotInfo").innerHTML = `
+      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" />
+      <div class="muted" style="margin-top:6px">Chụp lúc: ${timeAgo(shot.timestamp)}</div>
+    `;
   } else {
-     document.getElementById("authScreen").style.display = "block";
+    document.getElementById("screenshotInfo").innerHTML =
+      `<div class="muted">Chưa có ảnh nào — bấm nút phía trên để yêu cầu chụp.</div>`;
   }
- </script>
- </body>
+
+  // location
+  const toggle = document.getElementById("locationToggle");
+  if (s.locationEnabled) toggle.classList.add("on"); else toggle.classList.remove("on");
+
+  const loc = s.location;
+  if (!s.locationEnabled) {
+    document.getElementById("locationInfo").innerHTML =
+      `<div class="muted">Định vị đang tắt. Bật công tắc ở trên để bắt đầu xem vị trí.</div>`;
+  } else if (loc) {
+    document.getElementById("locationInfo").innerHTML = `
+      <div class="muted" style="margin-bottom:6px">Cập nhật: ${timeAgo(loc.timestamp)}</div>
+      <iframe class="location-map" loading="lazy"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=${loc.lng-0.01}%2C${loc.lat-0.01}%2C${loc.lng+0.01}%2C${loc.lat+0.01}&layer=mapnik&marker=${loc.lat}%2C${loc.lng}">
+      </iframe>
+      <div style="margin-top:8px">
+        <a class="location-link" href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener">Mở trong Google Maps →</a>
+      </div>
+    `;
+  } else {
+    document.getElementById("locationInfo").innerHTML =
+      `<div class="muted">Đã bật định vị — đang đợi máy con gửi vị trí đầu tiên (có thể mất vài phút).</div>`;
+  }
+
+  // schedule — hiện dạng tab theo từng thứ, mặc định chọn đúng hôm nay
+  const dayTabs = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const dayLabels = { T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
+  const today = todayDayCode();
+
+  document.getElementById("scheduleTabs").innerHTML = dayTabs.map(day => `
+    <button class="schedule-day-tab ${day===selectedScheduleDay ? 'active' : ''} ${day===today ? 'today' : ''}"
+      onclick="selectScheduleDay('${day}')">${dayLabels[day]}${day===today ? ' • Hôm nay' : ''}</button>
+  `).join("");
+
+  const itemsForSelectedDay = s.schedule
+    .filter(it => it.day === selectedScheduleDay || it.day === "daily")
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  let currentIdx = -1;
+  if (selectedScheduleDay === today) {
+    const nowStr = String(new Date().getHours()).padStart(2,"0") + ":" + String(new Date().getMinutes()).padStart(2,"0");
+    itemsForSelectedDay.forEach((it, i) => { if (it.time <= nowStr) currentIdx = i; });
+  }
+
+  document.getElementById("scheduleList").innerHTML = itemsForSelectedDay.length
+    ? itemsForSelectedDay.map((it, i) => `
+        <div class="schedule-item ${i === currentIdx ? 'current' : ''}">
+          ${i === currentIdx ? '<span class="schedule-now-tag">ĐANG DIỄN RA</span>' : ''}
+          <span class="schedule-time">${it.time}</span>
+          <span class="schedule-title">${it.title}${it.day === "daily" ? ' <span class="muted" style="display:inline">(hằng ngày)</span>' : ''}</span>
+          <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
+        </div>
+      `).join("")
+    : `<div class="muted">Chưa có lịch nào cho ${dayLabels[selectedScheduleDay]} — thêm hoạt động ở trên.</div>`;
+
+  // daily limit input (skip overwrite while user is typing)
+  const limitInput = document.getElementById("limitInput");
+  if (document.activeElement !== limitInput) limitInput.value = s.dailyLimit;
+
+  // blocked app chips
+  const customBlocked = s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p));
+  document.getElementById("blockedAppChips").innerHTML =
+    PRESET_APPS.map(a => `
+      <button class="chip-toggle ${s.blockedApps.includes(a.pkg) ? 'active' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${a.name}</button>
+    `).join("") +
+    customBlocked.map(p => `
+      <button class="chip-toggle active" onclick="toggleBlockedApp('${p}')">${p}</button>
+    `).join("");
+
+  // per-app minute limits (hiện tất cả app phổ biến + đã có giới hạn riêng + đã bị chặn thủ công)
+  const limitPkgs = PRESET_APPS.map(a => a.pkg)
+    .concat(Object.keys(s.appLimits).filter(p => !PRESET_APPS.some(a => a.pkg === p)))
+    .concat(s.blockedApps.filter(p => !PRESET_APPS.some(a => a.pkg === p)))
+    .filter((p, i, arr) => arr.indexOf(p) === i); // bỏ trùng
+  const focusedPkg = document.activeElement && document.activeElement.classList.contains("limit-input-field")
+    ? document.activeElement.dataset.pkg : null;
+  document.getElementById("appLimitRows").innerHTML = limitPkgs.map(pkg => {
+    const preset = PRESET_APPS.find(a => a.pkg === pkg);
+    const name = preset ? preset.name : prettyFromDotted(pkg);
+    const val = s.appLimits[pkg] || "";
+    const used = s.usageMap[pkg] || 0;
+    const limit = s.appLimits[pkg];
+    const isOver = limit && used >= limit;
+    return `
+      <div class="limit-row">
+        <span class="limit-name">${name}</span>
+        <span class="limit-used ${isOver ? 'over' : ''}">Đã dùng: ${used}p</span>
+        <input type="number" min="0" step="5" class="limit-input-field" data-pkg="${pkg}" value="${val}" />
+        <span class="limit-unit">phút/ngày</span>
+      </div>
+    `;
+  }).join("");
+  // giữ nguyên focus + con trỏ nếu người dùng đang gõ dở
+  if (focusedPkg) {
+    const el = document.querySelector(`.limit-input-field[data-pkg="${focusedPkg}"]`);
+    if (el) el.focus();
+  }
+
+  // apps
+  document.getElementById("appList").innerHTML = s.apps.length ? s.apps.map((a,i) => {
+    const isBlocked = s.blockedApps.includes(a.pkg);
+    return `
+    <div class="app-row">
+      <span class="app-name">${a.name}</span>
+      <div class="app-bar-bg"><div class="app-bar-fill" style="width:${Math.min(a.minutes*3,100)}%;background:${meta.color};opacity:${1 - i*0.12}"></div></div>
+      <span>${a.minutes}p</span>
+      <button class="app-block-btn ${isBlocked ? 'blocked' : ''}" onclick="toggleBlockedApp('${a.pkg}')">${isBlocked ? '✕ Đã chặn' : 'Chặn'}</button>
+    </div>
+  `;
+  }).join("") : `<div class="muted">Chưa có dữ liệu hôm nay</div>`;
+
+  // alerts
+  document.getElementById("alertsCard").style.display = s.alerts.length ? "block" : "none";
+  document.getElementById("alertList").innerHTML = s.alerts.map(a => `
+    <div class="alert-item">${a.label} · <span style="color:#B0BAC2">${a.time}</span></div>
+  `).join("");
+
+  // messages
+  document.getElementById("msgList").innerHTML = s.messages.map(m => `
+    <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
+      style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
+  `).join("");
+}
+
+function selectKid(id) { activeId = id; render(); }
+
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+document.getElementById("saveLimitBtn").addEventListener("click", saveDailyLimit);
+document.getElementById("addCustomAppBtn").addEventListener("click", addCustomApp);
+document.getElementById("customAppInput").addEventListener("keydown", e => { if (e.key === "Enter") addCustomApp(); });
+document.getElementById("saveAppLimitsBtn").addEventListener("click", saveAppLimits);
+document.getElementById("addScheduleBtn").addEventListener("click", addScheduleItem);
+document.getElementById("scheduleTitleInput").addEventListener("keydown", e => { if (e.key === "Enter") addScheduleItem(); });
+document.getElementById("requestScreenshotBtn").addEventListener("click", requestScreenshot);
+
+// ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
+async function fetchPendingDevices() {
+  try {
+    const data = await fbGet(`families/${FAMILY_ID}/pendingDevices`);
+    pendingDevices = data
+      ? Object.entries(data).map(([deviceUid, v]) => ({
+          deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
+        }))
+      : [];
+  } catch (e) {
+    pendingDevices = [];
+  }
+}
+
+async function approveDevice(deviceUid, childName, childGrade) {
+  const childId = slugifyName(childName);
+  try {
+    await fbPut(`families/${FAMILY_ID}/approvedDevices/${deviceUid}`, { childId, approvedAt: { ".sv": "timestamp" } });
+    await fbPut(`families/${FAMILY_ID}/children/${childId}/profile`, { name: childName, grade: childGrade || "" });
+    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+    pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
+    render();
+    await refreshAll();
+  } catch {
+    showError("Không duyệt được thiết bị — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function rejectDevice(deviceUid) {
+  try {
+    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+    pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
+    render();
+  } catch {
+    showError("Không từ chối được yêu cầu — kiểm tra kết nối Firebase.");
+  }
+}
+
+async function discoverChildren() {
+  if (!FAMILY_ID) return;
+  try {
+    const childrenData = await fbGet(`families/${FAMILY_ID}/children`);
+    const ids = childrenData ? Object.keys(childrenData) : [];
+    childrenMeta = ids.map((id, i) => {
+      const profile = (childrenData[id] && childrenData[id].profile) || {};
+      const c = CHILD_COLORS[i % CHILD_COLORS.length];
+      return { id, name: profile.name || id, grade: profile.grade || "", color: c.color, bg: c.bg };
+    });
+    childrenMeta.forEach(m => { if (!state[m.id]) state[m.id] = defaultChildState(); });
+    if (!activeId || !childrenMeta.some(m => m.id === activeId)) {
+      activeId = childrenMeta.length ? childrenMeta[0].id : null;
+    }
+  } catch (e) {
+    showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
+  }
+}
+
+async function refreshAll() {
+  await discoverChildren();
+  await fetchPendingDevices();
+  for (const m of childrenMeta) await refreshChild(m);
+  render();
+}
+
+// ---------- Đăng ký / Đăng nhập (dùng thẳng REST API của Firebase Auth, không cần SDK) ----------
+let authMode = "login";
+let idType = "phone"; // mặc định đăng ký/đăng nhập bằng số điện thoại
+
+function getSession() {
+  try { return JSON.parse(localStorage.getItem("fc_session") || "null"); }
+  catch { return null; }
+}
+function setSession(session) { localStorage.setItem("fc_session", JSON.stringify(session)); }
+function clearSession() { localStorage.removeItem("fc_session"); }
+
+// Lưu lại authTokens mới nhất (sau khi tự làm mới) vào cùng session đã lưu trước đó
+function persistSession() {
+  const existing = getSession();
+  if (existing) setSession({ ...existing, authTokens });
+}
+
+function randomFamilyCode() {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // bỏ ký tự dễ nhầm 0/O, 1/I
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// Số điện thoại không xác thực SMS thật (đỡ phải cấu hình reCAPTCHA/SMS trên
+// Firebase) — dùng số điện thoại làm "tên đăng nhập", quy đổi thành 1 email
+// giả nội bộ để tận dụng lại Firebase Email/Password Auth có sẵn.
+// Vẫn bắt buộc đúng cú pháp đầu số di động Việt Nam hiện hành.
+const VN_PHONE_REGEX = /^0(32|33|34|35|36|37|38|39|86|96|97|98|81|82|83|84|85|88|91|94|70|76|77|78|79|89|90|93|52|56|58|92|59|99|87|55)[0-9]{7}$/;
+
+function normalizeVNPhone(raw) {
+  let digits = raw.replace(/[^0-9]/g, "");
+  if (digits.length === 11 && digits.startsWith("84")) {
+    digits = "0" + digits.slice(2); // +84912345678 -> 0912345678
+  }
+  return digits;
+}
+function phoneToPseudoEmail(phone) {
+  const digits = normalizeVNPhone(phone);
+  return `sdt${digits}@sobengoan.app`;
+}
+
+function translateAuthError(code) {
+  if (code === "EMAIL_EXISTS") return idType === "phone" ? "Số điện thoại này đã đăng ký rồi — thử đăng nhập." : "Email này đã đăng ký rồi — thử đăng nhập.";
+  if (code === "EMAIL_NOT_FOUND" || code === "INVALID_PASSWORD" || code === "INVALID_LOGIN_CREDENTIALS")
+    return idType === "phone" ? "Sai số điện thoại hoặc mật khẩu." : "Sai email hoặc mật khẩu.";
+  if (typeof code === "string" && code.startsWith("WEAK_PASSWORD")) return "Mật khẩu quá ngắn (tối thiểu 6 ký tự).";
+  return "Có lỗi xảy ra, thử lại sau." + (code ? " (" + code + ")" : "");
+}
+
+function updateIdTypeUI() {
+  const phoneBtn = document.getElementById("idTypePhoneBtn");
+  const emailBtn = document.getElementById("idTypeEmailBtn");
+  const input = document.getElementById("authIdentifier");
+  phoneBtn.classList.toggle("active", idType === "phone");
+  emailBtn.classList.toggle("active", idType === "email");
+  if (idType === "phone") {
+    input.type = "tel";
+    input.placeholder = "Số điện thoại (vd: 0912345678)";
+  } else {
+    input.type = "email";
+    input.placeholder = "Email";
+  }
+  document.getElementById("authError").style.display = "none";
+}
+document.getElementById("idTypePhoneBtn").addEventListener("click", () => { idType = "phone"; updateIdTypeUI(); });
+document.getElementById("idTypeEmailBtn").addEventListener("click", () => { idType = "email"; updateIdTypeUI(); });
+updateIdTypeUI();
+
+document.getElementById("authToggleLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  authMode = authMode === "login" ? "register" : "login";
+  document.getElementById("authModeLabel").textContent = authMode === "login" ? "Đăng nhập" : "Đăng ký tài khoản mới";
+  document.getElementById("authSubmitBtn").textContent = authMode === "login" ? "Đăng nhập" : "Đăng ký";
+  document.getElementById("authToggleText").textContent = authMode === "login" ? "Chưa có tài khoản?" : "Đã có tài khoản?";
+  document.getElementById("authToggleLink").textContent = authMode === "login" ? "Đăng ký ngay" : "Đăng nhập";
+  document.getElementById("authError").style.display = "none";
+});
+
+document.getElementById("authSubmitBtn").addEventListener("click", handleAuthSubmit);
+document.getElementById("authPassword").addEventListener("keydown", e => { if (e.key === "Enter") handleAuthSubmit(); });
+
+async function handleAuthSubmit() {
+  const rawIdentifier = document.getElementById("authIdentifier").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errBox = document.getElementById("authError");
+  errBox.style.display = "none";
+
+  if (idType === "phone") {
+    const digits = normalizeVNPhone(rawIdentifier);
+    if (!VN_PHONE_REGEX.test(digits)) {
+      errBox.textContent = "Số điện thoại không đúng định dạng di động Việt Nam (vd: 0912345678).";
+      errBox.style.display = "block";
+      return;
+    }
+  } else if (!rawIdentifier.includes("@")) {
+    errBox.textContent = "Nhập email hợp lệ.";
+    errBox.style.display = "block";
+    return;
+  }
+  if (password.length < 6) {
+    errBox.textContent = "Mật khẩu tối thiểu 6 ký tự.";
+    errBox.style.display = "block";
+    return;
+  }
+  if (FIREBASE_API_KEY.includes("DÁN_")) {
+    errBox.textContent = "Chưa cấu hình FIREBASE_API_KEY trong file — xem hướng dẫn kèm theo.";
+    errBox.style.display = "block";
+    return;
+  }
+
+  const authEmail = idType === "phone" ? phoneToPseudoEmail(rawIdentifier) : rawIdentifier;
+  const endpoint = authMode === "login" ? "signInWithPassword" : "signUp";
+  try {
+    const res = await fetch(`${AUTH_BASE}:${endpoint}?key=${FIREBASE_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: authEmail, password, returnSecureToken: true })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errBox.textContent = translateAuthError(data.error && data.error.message);
+      errBox.style.display = "block";
+      return;
+    }
+    authTokens = {
+      idToken: data.idToken,
+      refreshToken: data.refreshToken,
+      expiresAt: Date.now() + Number(data.expiresIn) * 1000
+    };
+    await onAuthSuccess(data.localId, idType === "phone" ? normalizeVNPhone(rawIdentifier) : rawIdentifier, idType);
+  } catch (e) {
+    errBox.textContent = "Lỗi kết nối, thử lại sau.";
+    errBox.style.display = "block";
+  }
+}
+
+async function onAuthSuccess(uid, identifier, kind) {
+  const errBox = document.getElementById("authError");
+  let famId;
+  try {
+    const existing = await fbGet(`users/${uid}/familyId`);
+    if (existing) {
+      famId = existing;
+      // Bù lại ownerUid cho tài khoản đã tạo trước khi có luật bảo mật mới
+      await fbPut(`families/${famId}/meta/ownerUid`, uid).catch(() => {});
+    } else {
+      famId = randomFamilyCode();
+      await fbPut(`users/${uid}/familyId`, famId);
+      const meta = kind === "phone"
+        ? { ownerUid: uid, ownerPhone: identifier, createdAt: Date.now() }
+        : { ownerUid: uid, ownerEmail: identifier, createdAt: Date.now() };
+      await fbPut(`families/${famId}/meta`, meta);
+    }
+  } catch (e) {
+    errBox.textContent = "Đăng nhập thành công nhưng không lấy được Mã gia đình — thử tải lại trang.";
+    errBox.style.display = "block";
+    return;
+  }
+  FAMILY_ID = famId;
+  setSession({ uid, identifier, kind, familyId: famId, authTokens });
+  showDashboard();
+}
+
+function showDashboard() {
+  document.getElementById("authScreen").style.display = "none";
+  document.getElementById("dashboardApp").style.display = "block";
+  document.getElementById("familyCodeText").textContent = FAMILY_ID;
+  render();
+  refreshAll();
+  setInterval(refreshAll, 5000);
+  setInterval(render, 15000);
+}
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  clearSession();
+  location.reload();
+});
+
+// ---------- Khởi động ----------
+const existingSession = getSession();
+if (existingSession && existingSession.familyId && existingSession.authTokens) {
+  FAMILY_ID = existingSession.familyId;
+  authTokens = existingSession.authTokens;
+  showDashboard();
+} else {
+  document.getElementById("authScreen").style.display = "block";
+}
+</script>
+</body>
 </html>
