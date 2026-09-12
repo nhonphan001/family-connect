@@ -107,8 +107,14 @@
   .location-link { font-size: 13px; color: #6C8EBF; text-decoration: none; }
   .screenshot-img {
     max-width: 240px; width: 100%; border-radius: 12px; margin-top: 4px; display: block;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12); cursor: zoom-in;
   }
+  .lightbox-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 999; align-items: center; justify-content: center; padding: 20px; cursor: zoom-out;
+  }
+  .lightbox-overlay.open { display: flex; }
+  .lightbox-overlay img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
   .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .toggle-switch {
     position: relative; width: 42px; height: 24px; border-radius: 999px;
@@ -364,10 +370,14 @@
   </div>
 </div>
 
+<div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" />
+</div>
+
 <script>
-const FIREBASE_URL = "https://family-connect-694a7-default-rtdb.asia-southeast1.firebasedatabase.app";
+const FIREBASE_URL = "https://so-be-ngoan-v2-default-rtdb.asia-southeast1.firebasedatabase.app";
 // ⚠️ Lấy ở Firebase Console > Project Settings (biểu tượng bánh răng) > General > "Web API Key"
-const FIREBASE_API_KEY = "AIzaSyAmeZjEYX7arEzphoZo0OCuURWhgAz9gBI";
+const FIREBASE_API_KEY = "AIzaSyD2uEaz7Czvo6oKCRKrrLGY6Z4nVq8OK_g";
 const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
 
 let FAMILY_ID = null; // được gán sau khi đăng nhập/đăng ký thành công
@@ -415,7 +425,7 @@ function defaultChildState() {
     dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
     blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
     location: null, locationEnabled: false, schedule: [], currentApp: null,
-    bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null
+    bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null, screenshotFetched: false
   };
 }
 
@@ -441,6 +451,14 @@ function timeAgo(ts) {
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24) return diffHr + " giờ trước";
   return Math.floor(diffHr / 24) + " ngày trước";
+}
+
+function openLightbox(base64) {
+  document.getElementById("lightboxImg").src = `data:image/jpeg;base64,${base64}`;
+  document.getElementById("lightboxOverlay").classList.add("open");
+}
+function closeLightbox() {
+  document.getElementById("lightboxOverlay").classList.remove("open");
 }
 
 function showError(msg) {
@@ -478,8 +496,11 @@ async function authQueryParam() {
   return token ? `?auth=${token}` : "";
 }
 
-async function fbGet(path) {
-  const res = await fetch(`${FIREBASE_URL}/${path}.json${await authQueryParam()}`);
+async function fbGet(path, extraQuery) {
+  const authQ = await authQueryParam();
+  const sep = authQ ? "&" : "?";
+  const url = `${FIREBASE_URL}/${path}.json${authQ}${extraQuery ? sep + extraQuery : ""}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error("GET failed " + res.status);
   return res.json();
 }
@@ -514,9 +535,29 @@ function prettyFromDotted(pkg) {
 
 async function refreshChild(meta) {
   try {
-    const data = await fbGet(`families/${FAMILY_ID}/children/${meta.id}`);
+    const today = todayKey();
+    const prev = state[meta.id];
+    // Ảnh chụp màn hình khá nặng — chỉ tải khi thật sự cần (lần đầu tiên, hoặc
+    // đang chờ ảnh mới sau khi bấm nút chụp), KHÔNG tải lại mỗi 5 giây như các
+    // dữ liệu chữ khác, để tránh tốn băng thông vô ích.
+    const needScreenshot = !prev.screenshotFetched || !!prev.screenshotRequestedAt;
+    const [rules, rewards, status, device, location, schedule, messagesObj, alertsObj, usageTodayObj, extReqObj, screenshot] = await Promise.all([
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/rules`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/rewards`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/status`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/device`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/location`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/schedule`).catch(() => null),
+      // Chỉ lấy 50 tin nhắn gần nhất, 5 cảnh báo gần nhất, và usage của ĐÚNG hôm nay —
+      // trước đây tải nguyên lịch sử từ ngày đầu dùng app, càng dùng lâu càng chậm.
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/messages`, `orderBy="timestamp"&limitToLast=50`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/alerts`, `orderBy="timestamp"&limitToLast=5`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/usage/${today}`).catch(() => null),
+      fbGet(`families/${FAMILY_ID}/children/${meta.id}/extensionRequests`, `orderBy="timestamp"&limitToLast=5`).catch(() => null),
+      needScreenshot ? fbGet(`families/${FAMILY_ID}/children/${meta.id}/screenshot`).catch(() => null) : Promise.resolve(undefined),
+    ]);
     showError(null);
-    const usageToday = (data && data.usage && data.usage[todayKey()]) || {};
+    const usageToday = usageTodayObj || {};
     const apps = Object.entries(usageToday)
       .map(([key, minutes]) => ({ name: prettyAppName(key), pkg: key.replace(/_/g, "."), minutes: Number(minutes) }))
       .filter(a => a.minutes > 0)
@@ -526,9 +567,9 @@ async function refreshChild(meta) {
       usageMap[key.replace(/_/g, ".")] = Number(minutes);
     });
     const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
-    const messages = data && data.messages ? Object.values(data.messages).sort((a,b)=>a.timestamp-b.timestamp) : [];
-    const alerts = data && data.alerts
-      ? Object.values(data.alerts).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
+    const messages = messagesObj ? Object.values(messagesObj).sort((a,b)=>a.timestamp-b.timestamp) : [];
+    const alerts = alertsObj
+      ? Object.values(alertsObj).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
           label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
                : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
                : a.type === "APP_LIMIT" ? `Đã hết giờ riêng cho: ${prettyFromDotted(a.packageName)}`
@@ -537,28 +578,29 @@ async function refreshChild(meta) {
           time: formatAlertTime(a.timestamp)
         }))
       : [];
-    const appLimitsArr = (data && data.rules && data.rules.appLimits) || [];
+    const appLimitsArr = (rules && rules.appLimits) || [];
     const appLimits = {};
     appLimitsArr.forEach(entry => { if (entry && entry.pkg) appLimits[entry.pkg] = entry.limitMinutes; });
     state[meta.id] = {
-      dailyLimit: (data && data.rules && data.rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
-      usedToday, points: (data && data.rewards && data.rewards.points) || 0,
+      dailyLimit: (rules && rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
+      usedToday, points: (rewards && rewards.points) || 0,
       apps, alerts, messages,
-      blockedApps: (data && data.rules && data.rules.blockedApps) || [],
-      lastSeen: (data && data.status && data.status.lastSeen) || null,
+      blockedApps: (rules && rules.blockedApps) || [],
+      lastSeen: (status && status.lastSeen) || null,
       appLimits, usageMap,
-      device: (data && data.device) || null,
-      location: (data && data.location) || null,
-      locationEnabled: (data && data.rules && data.rules.locationEnabled) || false,
-      schedule: data && data.schedule
-        ? Object.entries(data.schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
+      device: device || null,
+      location: location || null,
+      locationEnabled: (rules && rules.locationEnabled) || false,
+      schedule: schedule
+        ? Object.entries(schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
         : [],
-      currentApp: (data && data.status && data.status.currentApp) || null,
-      bonusMinutesToday: (data && data.rules && data.rules.bonusMinutes && data.rules.bonusMinutes[todayKey()]) || 0,
-      extensionRequests: data && data.extensionRequests
-        ? Object.entries(data.extensionRequests).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
+      currentApp: (status && status.currentApp) || null,
+      bonusMinutesToday: (rules && rules.bonusMinutes && rules.bonusMinutes[today]) || 0,
+      extensionRequests: extReqObj
+        ? Object.entries(extReqObj).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
         : [],
-      screenshot: (data && data.screenshot) || null,
+      screenshot: screenshot !== undefined ? (screenshot || null) : prev.screenshot, // giữ ảnh cũ nếu lần này bỏ qua tải
+      screenshotFetched: true,
       screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
     };
     render();
@@ -839,7 +881,8 @@ function render() {
       `<div class="muted">Đã gửi yêu cầu — máy con cần đang mở màn hình và có mạng để chụp được. Có thể mất khoảng 1 phút.</div>`;
   } else if (shot) {
     document.getElementById("screenshotInfo").innerHTML = `
-      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" />
+      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" onclick="openLightbox(state[activeId].screenshot.imageBase64)" />
+      <div class="muted" style="margin-top:2px">Bấm vào ảnh để phóng to</div>
       <div class="muted" style="margin-top:6px">Chụp lúc: ${timeAgo(shot.timestamp)}</div>
     `;
   } else {
@@ -1039,11 +1082,18 @@ async function discoverChildren() {
   }
 }
 
+let refreshInProgress = false;
 async function refreshAll() {
-  await discoverChildren();
-  await fetchPendingDevices();
-  for (const m of childrenMeta) await refreshChild(m);
-  render();
+  if (refreshInProgress) return; // tránh chồng lệnh khi lần trước chưa xong (gây dồn ứ request)
+  refreshInProgress = true;
+  try {
+    await discoverChildren();
+    await fetchPendingDevices();
+    for (const m of childrenMeta) await refreshChild(m);
+    render();
+  } finally {
+    refreshInProgress = false;
+  }
 }
 
 // ---------- Đăng ký / Đăng nhập (dùng thẳng REST API của Firebase Auth, không cần SDK) ----------
