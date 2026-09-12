@@ -403,6 +403,10 @@ const PRESET_APPS = [
 let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
 let activeId = null;
 let pendingDevices = []; // thiết bị đang xin ghép nối, chờ phụ huynh Duyệt
+// Các deviceUid đã bấm Duyệt trong phiên làm việc này — dùng để lọc, phòng
+// trường hợp việc xoá pendingDevices trên Firebase bị chậm hoặc bị luật bảo
+// mật chặn, để dòng "Duyệt" không bao giờ hiện lại sau khi đã duyệt.
+let approvedDeviceUids = new Set();
 let state = {}; // { childId: { ..., device, location, locationEnabled } }
 
 function slugifyName(name) {
@@ -1030,9 +1034,11 @@ async function fetchPendingDevices() {
   try {
     const data = await fbGet(`families/${FAMILY_ID}/pendingDevices`);
     pendingDevices = data
-      ? Object.entries(data).map(([deviceUid, v]) => ({
-          deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
-        }))
+      ? Object.entries(data)
+          .filter(([deviceUid]) => !approvedDeviceUids.has(deviceUid))
+          .map(([deviceUid, v]) => ({
+            deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
+          }))
       : [];
   } catch (e) {
     pendingDevices = [];
@@ -1041,16 +1047,43 @@ async function fetchPendingDevices() {
 
 async function approveDevice(deviceUid, childName, childGrade) {
   const childId = slugifyName(childName);
+
+  // Bỏ dòng "Duyệt" khỏi giao diện ngay lập tức — không chờ các lệnh ghi
+  // Firebase bên dưới, vì nếu một trong số đó bị chặn (ví dụ luật bảo mật
+  // không cho phép xoá pendingDevices của thiết bị khác) thì trước đây cả
+  // hàm dừng giữa chừng và dòng "Duyệt" bị kẹt lại trên dashboard mãi,
+  // dù máy con đã ghép nối thành công.
+  approvedDeviceUids.add(deviceUid);
+  pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
+  render();
+
   try {
     await fbPut(`families/${FAMILY_ID}/approvedDevices/${deviceUid}`, { childId, approvedAt: { ".sv": "timestamp" } });
-    await fbPut(`families/${FAMILY_ID}/children/${childId}/profile`, { name: childName, grade: childGrade || "" });
-    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
-    pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
-    render();
-    await refreshAll();
-  } catch {
+  } catch (e) {
+    console.error("Ghi approvedDevices thất bại:", e);
     showError("Không duyệt được thiết bị — kiểm tra kết nối Firebase.");
+    approvedDeviceUids.delete(deviceUid);
+    await fetchPendingDevices();
+    render();
+    return;
   }
+
+  try {
+    await fbPut(`families/${FAMILY_ID}/children/${childId}/profile`, { name: childName, grade: childGrade || "" });
+  } catch (e) {
+    console.error("Ghi hồ sơ bé thất bại:", e);
+  }
+
+  try {
+    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+  } catch (e) {
+    // Không chặn UI vì hàng chờ (pendingDevices) đã bị lọc bỏ ở phía dashboard
+    // theo approvedDeviceUids phía trên — nhưng vẫn log lại để biết luật bảo
+    // mật Firebase có đang chặn xoá pendingDevices hay không.
+    console.error("Xoá pendingDevices thất bại (có thể do luật bảo mật) — dòng vẫn không tái xuất hiện vì đã lọc theo approvedDeviceUids:", e);
+  }
+
+  await refreshAll();
 }
 
 async function rejectDevice(deviceUid) {
