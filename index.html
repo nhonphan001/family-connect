@@ -1032,14 +1032,37 @@ document.getElementById("requestScreenshotBtn").addEventListener("click", reques
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
 async function fetchPendingDevices() {
   try {
-    const data = await fbGet(`families/${FAMILY_ID}/pendingDevices`);
+    const [data, approvedData] = await Promise.all([
+      fbGet(`families/${FAMILY_ID}/pendingDevices`),
+      fbGet(`families/${FAMILY_ID}/approvedDevices`).catch(() => null)
+    ]);
+    // Thiết bị nào đã có trong approvedDevices trên Firebase (tức đã Duyệt
+    // thành công thật sự) thì luôn ẩn khỏi hàng chờ — không chỉ dựa vào
+    // approvedDeviceUids của phiên làm việc này (biến đó mất khi tải lại
+    // trang). Đây là nguyên nhân dòng "Duyệt" cứ hiện lại sau khi F5: lệnh
+    // xoá pendingDevices bị luật bảo mật Firebase chặn nên node cũ vẫn còn
+    // nằm trên Firebase mãi, và mỗi lần tải lại trang thì nó lại xuất hiện.
+    const approvedUids = new Set([
+      ...approvedDeviceUids,
+      ...(approvedData ? Object.keys(approvedData) : [])
+    ]);
     pendingDevices = data
       ? Object.entries(data)
-          .filter(([deviceUid]) => !approvedDeviceUids.has(deviceUid))
+          .filter(([deviceUid]) => !approvedUids.has(deviceUid))
           .map(([deviceUid, v]) => ({
             deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
           }))
       : [];
+    // Dọn rác âm thầm: đã xác nhận là đã duyệt rồi thì thử xoá lại node
+    // pendingDevices thừa trên Firebase (không quan trọng nếu vẫn thất bại
+    // do luật bảo mật — dashboard đã tự lọc bằng approvedUids ở trên rồi).
+    if (data) {
+      for (const deviceUid of Object.keys(data)) {
+        if (approvedUids.has(deviceUid)) {
+          fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`).catch(() => {});
+        }
+      }
+    }
   } catch (e) {
     pendingDevices = [];
   }
