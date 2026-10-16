@@ -38,6 +38,16 @@
     margin-right: 5px;
   }
   .status-line { font-size: 11px; margin-top: 2px; }
+  .device-selector-title { font-weight: 700; font-size: 15px; color: #1C3D4E; margin: 4px 0 8px; }
+  .device-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .device-chip {
+    display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap;
+    background: #fff; border: 2px solid transparent; border-radius: 12px;
+    padding: 8px 12px; font-size: 13px; font-weight: 600; color: #1C3D4E; cursor: pointer;
+  }
+  .device-chip.active { border-color: #6C8EBF; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .device-chip-status { font-size: 11px; font-weight: 400; color: #8B9AA5; margin-left: 6px; }
+  .section-heading { font-weight: 700; font-size: 15px; color: #1C3D4E; margin: 28px 0 10px; }
   .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
   @media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
   .card { background: #fff; border-radius: 16px; padding: 20px; }
@@ -249,24 +259,18 @@
 
   <div id="childDetailSections">
   <div id="extensionRequestBanner"></div>
+  <div id="deviceSelector"></div>
 
-  <div class="grid two">
-    <div class="card">
-      <div class="card-title">⏱ Thời gian dùng máy hôm nay</div>
-      <div class="big-num" id="usedToday">0</div>
-      <div class="muted" id="limitLine"></div>
-      <div class="bar-bg"><div class="bar-fill" id="usageBar"></div></div>
-      <div class="muted" id="remainLine"></div>
+  <div id="deviceSections">
+  <div class="card">
+    <div class="card-title" style="justify-content:space-between; flex-wrap:wrap">
+      <span>⏱ Thời gian dùng máy hôm nay</span>
+      <span id="deviceActions" style="display:flex; gap:6px; flex-wrap:wrap"></span>
     </div>
-    <div class="card">
-      <div class="card-title">⭐ Điểm thưởng</div>
-      <div class="big-num" id="points" style="color:#2F9E8F">0</div>
-      <div style="margin-top:10px">
-        <button class="pill-btn" onclick="awardPoints(10)">+10</button>
-        <button class="pill-btn" onclick="awardPoints(20)">+20</button>
-        <button class="pill-btn" onclick="awardPoints(50)">+50</button>
-      </div>
-    </div>
+    <div class="big-num" id="usedToday">0</div>
+    <div class="muted" id="limitLine"></div>
+    <div class="bar-bg"><div class="bar-fill" id="usageBar"></div></div>
+    <div class="muted" id="remainLine"></div>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -316,6 +320,7 @@
 
   <div class="card" style="margin-top:16px">
     <div class="card-title">🔒 Giới hạn & chặn ứng dụng</div>
+    <div class="muted" id="deviceRulesNote" style="margin:-6px 0 10px"></div>
     <div class="muted" style="margin-bottom:10px">Giới hạn thời gian dùng máy mỗi ngày (phút)</div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:18px; flex-wrap:wrap">
       <input type="number" id="limitInput" class="msg-input" style="max-width:100px; flex:none" min="0" step="5" />
@@ -337,6 +342,20 @@
     </div>
     <div id="appLimitRows"></div>
     <button class="save-btn" id="saveAppLimitsBtn" style="background:#2F9E8F; margin-top:10px">Lưu giới hạn</button>
+  </div>
+
+  </div><!-- /deviceSections -->
+
+  <div class="section-heading" id="sharedHeading">Chung cho bé</div>
+
+  <div class="card">
+    <div class="card-title">⭐ Điểm thưởng</div>
+    <div class="big-num" id="points" style="color:#2F9E8F">0</div>
+    <div style="margin-top:10px">
+      <button class="pill-btn" onclick="awardPoints(10)">+10</button>
+      <button class="pill-btn" onclick="awardPoints(20)">+20</button>
+      <button class="pill-btn" onclick="awardPoints(50)">+50</button>
+    </div>
   </div>
 
   <div class="card" style="margin-top:16px">
@@ -404,14 +423,23 @@ const PRESET_APPS = [
 let childrenMeta = []; // được phát hiện tự động từ Firebase, không còn cố định 2 bé nữa
 let activeId = null;
 let pendingDevices = []; // thiết bị đang xin ghép nối, chờ phụ huynh Duyệt
-// Các deviceUid đã bấm Duyệt trong phiên làm việc này — dùng để lọc, phòng
-// trường hợp việc xoá pendingDevices trên Firebase bị chậm hoặc bị luật bảo
-// mật chặn, để dòng "Duyệt" không bao giờ hiện lại sau khi đã duyệt.
-let approvedDeviceUids = new Set();
-// Các deviceUid đã bấm "Từ chối" trong phiên làm việc này — tương tự
-// approvedDeviceUids, dùng để ẩn ngay lập tức trong lúc chờ ghi lên Firebase.
-let rejectedDeviceUids = new Set();
-let state = {}; // { childId: { ..., device, location, locationEnabled } }
+// deviceUid -> childId của các thiết bị đã biết là đã Duyệt. Luật bảo mật chỉ
+// cho phụ huynh đọc TỪNG approvedDevices/{deviceUid}, không đọc được cả node.
+let approvedChildOf = {};
+// deviceUid -> thời điểm phụ huynh Từ chối hoặc Xoá thiết bị. Yêu cầu ghép nối
+// gửi SAU thời điểm đó (máy xin ghép nối lại) vẫn hiện bình thường.
+let dismissedAt = {};
+// { childId: { points, messages, schedule, childRules, legacyLastSeen, deviceIds, devices: { deviceUid: {...} } } }
+// Mỗi bé có thể dùng nhiều máy: phần chung của bé (điểm, lịch, tin nhắn) nằm ở
+// cấp bé, còn mọi thứ của máy (online, giờ dùng, giới hạn, chặn app, ảnh chụp,
+// vị trí, xin thêm giờ) nằm riêng trong devices/{deviceUid}.
+let state = {};
+let activeDevice = {}; // childId -> deviceUid đang xem
+
+function esc(str) {
+  return String(str == null ? "" : str).replace(/[&<>"']/g, ch =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
 
 function slugifyName(name) {
   const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -429,12 +457,35 @@ let selectedScheduleDay = todayDayCode();
 function selectScheduleDay(day) { selectedScheduleDay = day; render(); }
 
 function defaultChildState() {
+  return { points: 0, messages: [], schedule: [], childRules: null, legacyLastSeen: null, deviceIds: [], devices: {} };
+}
+
+function defaultDeviceState() {
   return {
-    dailyLimit: 90, usedToday: 0, points: 0, apps: [], alerts: [], messages: [],
+    label: "", dailyLimit: 120, hasOwnRules: false, usedToday: 0, apps: [], alerts: [],
     blockedApps: [], lastSeen: null, appLimits: {}, usageMap: {}, device: null,
-    location: null, locationEnabled: false, schedule: [], currentApp: null,
+    location: null, locationEnabled: false, currentApp: null,
     bonusMinutesToday: 0, extensionRequests: [], screenshot: null, screenshotRequestedAt: null, screenshotFetched: false
   };
+}
+
+function devicePath(childId, deviceUid) {
+  return `families/${FAMILY_ID}/children/${childId}/devices/${deviceUid}`;
+}
+
+function deviceLabel(d, deviceUid) {
+  return d.label || (d.device && d.device.model) || "Thiết bị " + deviceUid.slice(0, 5);
+}
+
+function isOnline(lastSeen) {
+  return !!lastSeen && (Date.now() - lastSeen) < ONLINE_THRESHOLD_MS;
+}
+
+// Thiết bị đang xem của bé đang xem — null nếu bé chưa có thiết bị nào.
+function currentDevice() {
+  const cs = activeId && state[activeId];
+  const uid = cs && activeDevice[activeId];
+  return uid && cs.devices[uid] ? { childId: activeId, uid, d: cs.devices[uid] } : null;
 }
 
 function todayKey() {
@@ -541,43 +592,118 @@ function prettyFromDotted(pkg) {
   return last.charAt(0).toUpperCase() + last.slice(1);
 }
 
+// Giới hạn đang có hiệu lực cho 1 máy: của riêng máy nếu ba mẹ đã cài đặt
+// riêng, nếu chưa thì giới hạn chung của bé (giống cách app trên máy con chọn).
+function parseRules(rules) {
+  const appLimits = {};
+  Object.values((rules && rules.appLimits) || {}).forEach(e => { if (e && e.pkg) appLimits[e.pkg] = e.limitMinutes; });
+  return {
+    dailyLimit: rules && rules.dailyLimitMinutes != null ? rules.dailyLimitMinutes : 120,
+    blockedApps: (rules && rules.blockedApps) || [],
+    appLimits,
+    locationEnabled: (rules && rules.locationEnabled) || false,
+    bonusMinutesToday: (rules && rules.bonusMinutes && rules.bonusMinutes[todayKey()]) || 0,
+  };
+}
+
 async function refreshChild(meta) {
+  const base = `families/${FAMILY_ID}/children/${meta.id}`;
   try {
-    const today = todayKey();
-    const prev = state[meta.id];
-    // Ảnh chụp màn hình khá nặng — chỉ tải khi thật sự cần (lần đầu tiên, hoặc
-    // đang chờ ảnh mới sau khi bấm nút chụp), KHÔNG tải lại mỗi 5 giây như các
-    // dữ liệu chữ khác, để tránh tốn băng thông vô ích.
-    const needScreenshot = !prev.screenshotFetched || !!prev.screenshotRequestedAt;
-    const [rules, rewards, status, device, location, schedule, messagesObj, alertsObj, usageTodayObj, extReqObj, screenshot] = await Promise.all([
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/rules`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/rewards`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/status`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/device`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/location`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/schedule`).catch(() => null),
-      // Chỉ lấy 50 tin nhắn gần nhất, 5 cảnh báo gần nhất, và usage của ĐÚNG hôm nay —
-      // trước đây tải nguyên lịch sử từ ngày đầu dùng app, càng dùng lâu càng chậm.
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/messages`, `orderBy="timestamp"&limitToLast=50`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/alerts`, `orderBy="timestamp"&limitToLast=5`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/usage/${today}`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/children/${meta.id}/extensionRequests`, `orderBy="timestamp"&limitToLast=5`)
-        .catch(e => { console.error(`Tải extensionRequests của ${meta.id} thất bại:`, e); return null; }),
-      needScreenshot ? fbGet(`families/${FAMILY_ID}/children/${meta.id}/screenshot`).catch(() => null) : Promise.resolve(undefined),
+    const cs = state[meta.id];
+    const [rules, rewards, legacyLastSeen, schedule, messagesObj, deviceKeys] = await Promise.all([
+      fbGet(`${base}/rules`).catch(() => null),
+      fbGet(`${base}/rewards`).catch(() => null),
+      // Máy còn chạy bản app cũ vẫn ghi tín hiệu ở cấp bé, chưa vào devices/.
+      fbGet(`${base}/status/lastSeen`).catch(() => null),
+      fbGet(`${base}/schedule`).catch(() => null),
+      // Chỉ lấy 50 tin nhắn gần nhất — tải nguyên lịch sử thì càng dùng lâu càng chậm.
+      fbGet(`${base}/messages`, `orderBy="timestamp"&limitToLast=50`).catch(() => null),
+      // shallow: chỉ lấy danh sách deviceUid, không kéo theo giờ dùng/ảnh chụp của mọi máy.
+      fbGet(`${base}/devices`, "shallow=true").catch(e => { console.error(`Tải danh sách thiết bị của ${meta.id} thất bại:`, e); return null; }),
     ]);
+    cs.childRules = rules;
+    cs.points = (rewards && rewards.points) || 0;
+    cs.legacyLastSeen = legacyLastSeen || null;
+    cs.schedule = schedule
+      ? Object.entries(schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
+      : [];
+    cs.messages = messagesObj ? Object.values(messagesObj).sort((a,b)=>a.timestamp-b.timestamp) : [];
+
+    // Máy được Duyệt trước khi có devices/ chưa có node riêng — tạo sẵn để ba
+    // mẹ thấy máy đó (và xoá được nếu là máy cũ không còn dùng).
+    const ids = new Set(Object.keys(deviceKeys || {}));
+    for (const [uid, childId] of Object.entries(approvedChildOf)) {
+      if (childId !== meta.id || ids.has(uid) || dismissedAt[uid]) continue;
+      ids.add(uid);
+      fbPut(`${devicePath(meta.id, uid)}/info/approvedAt`, { ".sv": "timestamp" })
+        .catch(e => console.error(`Tạo node thiết bị ${uid} thất bại:`, e));
+    }
+    cs.deviceIds = [...ids].sort();
+    Object.keys(cs.devices).forEach(uid => { if (!ids.has(uid)) delete cs.devices[uid]; });
+    cs.deviceIds.forEach(uid => { if (!cs.devices[uid]) cs.devices[uid] = defaultDeviceState(); });
+    if (!cs.deviceIds.includes(activeDevice[meta.id])) activeDevice[meta.id] = cs.deviceIds[0] || null;
+
+    await Promise.all(cs.deviceIds.map(uid =>
+      refreshDevice(meta.id, uid, meta.id === activeId && uid === activeDevice[meta.id])
+    ));
     showError(null);
+    render();
+  } catch (e) {
+    console.error(`Tải dữ liệu của ${meta.id} thất bại:`, e);
+    showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
+  }
+}
+
+// withDetail: chỉ máy đang mở xem mới tải giờ dùng, cảnh báo, vị trí và ảnh
+// chụp — các máy khác chỉ cần trạng thái online và yêu cầu xin thêm giờ.
+async function refreshDevice(childId, uid, withDetail) {
+  const p = devicePath(childId, uid);
+  const prev = state[childId].devices[uid];
+  const today = todayKey();
+  // Ảnh chụp màn hình khá nặng — chỉ tải khi thật sự cần (lần đầu tiên, hoặc
+  // đang chờ ảnh mới sau khi bấm nút chụp), KHÔNG tải lại mỗi 5 giây.
+  const needScreenshot = withDetail && (!prev.screenshotFetched || !!prev.screenshotRequestedAt);
+  const skip = Promise.resolve(undefined);
+  const [info, status, device, rules, extReqObj, usageTodayObj, alertsObj, location, screenshot] = await Promise.all([
+    fbGet(`${p}/info`).catch(() => null),
+    fbGet(`${p}/status`).catch(() => null),
+    fbGet(`${p}/device`).catch(() => null),
+    fbGet(`${p}/rules`).catch(() => null),
+    fbGet(`${p}/extensionRequests`, `orderBy="timestamp"&limitToLast=5`)
+      .catch(e => { console.error(`Tải extensionRequests của ${childId}/${uid} thất bại:`, e); return null; }),
+    withDetail ? fbGet(`${p}/usage/${today}`).catch(() => null) : skip,
+    withDetail ? fbGet(`${p}/alerts`, `orderBy="timestamp"&limitToLast=5`).catch(() => null) : skip,
+    withDetail ? fbGet(`${p}/location`).catch(() => null) : skip,
+    needScreenshot ? fbGet(`${p}/screenshot`).catch(() => null) : skip,
+  ]);
+  const d = state[childId].devices[uid];
+  if (!d) return; // máy vừa bị xoá trong lúc đang tải
+
+  Object.assign(d, parseRules(rules || state[childId].childRules), {
+    hasOwnRules: !!rules,
+    label: (info && info.label) || "",
+    lastSeen: (status && status.lastSeen) || null,
+    currentApp: (status && status.currentApp) || null,
+    device: device || null,
+    extensionRequests: extReqObj
+      ? Object.entries(extReqObj).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
+      : [],
+  });
+
+  if (usageTodayObj !== undefined) {
     const usageToday = usageTodayObj || {};
-    const apps = Object.entries(usageToday)
+    d.apps = Object.entries(usageToday)
       .map(([key, minutes]) => ({ name: prettyAppName(key), pkg: key.replace(/_/g, "."), minutes: Number(minutes) }))
       .filter(a => a.minutes > 0)
       .sort((a,b) => b.minutes - a.minutes).slice(0,15);
-    const usageMap = {};
+    d.usageMap = {};
     Object.entries(usageToday).forEach(([key, minutes]) => {
-      usageMap[key.replace(/_/g, ".")] = Number(minutes);
+      d.usageMap[key.replace(/_/g, ".")] = Number(minutes);
     });
-    const usedToday = Object.values(usageMap).reduce((s,m) => s + m, 0);
-    const messages = messagesObj ? Object.values(messagesObj).sort((a,b)=>a.timestamp-b.timestamp) : [];
-    const alerts = alertsObj
+    d.usedToday = Object.values(d.usageMap).reduce((sum,m) => sum + m, 0);
+  }
+  if (alertsObj !== undefined) {
+    d.alerts = alertsObj
       ? Object.values(alertsObj).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5).map(a => ({
           label: a.type === "OVER_LIMIT" ? "Đã hết giờ dùng máy"
                : a.type === "BLOCKED_APP" ? `Đã chặn ứng dụng: ${a.packageName}`
@@ -587,34 +713,11 @@ async function refreshChild(meta) {
           time: formatAlertTime(a.timestamp)
         }))
       : [];
-    const appLimitsArr = (rules && rules.appLimits) || [];
-    const appLimits = {};
-    appLimitsArr.forEach(entry => { if (entry && entry.pkg) appLimits[entry.pkg] = entry.limitMinutes; });
-    state[meta.id] = {
-      dailyLimit: (rules && rules.dailyLimitMinutes) || state[meta.id].dailyLimit,
-      usedToday, points: (rewards && rewards.points) || 0,
-      apps, alerts, messages,
-      blockedApps: (rules && rules.blockedApps) || [],
-      lastSeen: (status && status.lastSeen) || null,
-      appLimits, usageMap,
-      device: device || null,
-      location: location || null,
-      locationEnabled: (rules && rules.locationEnabled) || false,
-      schedule: schedule
-        ? Object.entries(schedule).map(([id, v]) => ({ id, day: v.day, time: v.time, title: v.title }))
-        : [],
-      currentApp: (status && status.currentApp) || null,
-      bonusMinutesToday: (rules && rules.bonusMinutes && rules.bonusMinutes[today]) || 0,
-      extensionRequests: extReqObj
-        ? Object.entries(extReqObj).map(([id, v]) => ({ id, timestamp: v.timestamp, status: v.status }))
-        : [],
-      screenshot: screenshot !== undefined ? (screenshot || null) : prev.screenshot, // giữ ảnh cũ nếu lần này bỏ qua tải
-      screenshotFetched: true,
-      screenshotRequestedAt: state[meta.id].screenshotRequestedAt // giữ nguyên, chỉ đổi khi bấm nút chụp
-    };
-    render();
-  } catch (e) {
-    showError("Chưa kết nối được tới Firebase. Kiểm tra lại FIREBASE_URL và Rules trong Firebase Console.");
+  }
+  if (location !== undefined) d.location = location || null;
+  if (screenshot !== undefined) {
+    d.screenshot = screenshot || null;
+    d.screenshotFetched = true;
   }
 }
 
@@ -638,84 +741,119 @@ async function awardPoints(amount) {
   catch { showError("Không cộng được điểm — kiểm tra kết nối Firebase."); }
 }
 
-async function clearPendingExtensionRequests(childId) {
-  const id = childId || activeId;
-  const reqs = state[id].extensionRequests.filter(r => r.status === "pending");
-  for (const r of reqs) {
-    try { await fbPut(`families/${FAMILY_ID}/children/${id}/extensionRequests/${r.id}/status`, "handled"); }
+async function clearPendingExtensionRequests(childId, uid) {
+  const d = state[childId] && state[childId].devices[uid];
+  if (!d) return;
+  for (const r of d.extensionRequests.filter(r => r.status === "pending")) {
+    try { await fbPut(`${devicePath(childId, uid)}/extensionRequests/${r.id}/status`, "handled"); }
     catch { /* bỏ qua, không quan trọng bằng việc đã thưởng giờ */ }
   }
-  state[id].extensionRequests = state[id].extensionRequests.map(r =>
+  d.extensionRequests = d.extensionRequests.map(r =>
     r.status === "pending" ? { ...r, status: "handled" } : r
   );
 }
 
-// childId là tham số tuỳ chọn — cho phép thưởng giờ ngay từ banner "xin thêm
-// giờ" hiển thị ở đầu trang (áp dụng cho MỌI bé), không bắt buộc phải đang
-// mở đúng tab của bé đó mới thưởng được (xem lý do thêm banner này ở render()).
-async function grantBonusMinutes(minutes, childId) {
-  const id = childId || activeId;
+// Máy chưa được cài đặt riêng thì đang dùng giới hạn chung của bé
+// (children/{id}/rules). Trước lần sửa đầu tiên phải chép NGUYÊN bộ giới hạn
+// đó sang devices/{uid}/rules — nếu chỉ ghi 1 trường, app trên máy con sẽ coi
+// như máy đã có giới hạn riêng và mất hết các trường còn lại (chặn app...).
+async function ensureDeviceRules(childId, uid) {
+  const d = state[childId].devices[uid];
+  if (d.hasOwnRules) return;
+  const rules = {
+    dailyLimitMinutes: d.dailyLimit,
+    blockedApps: d.blockedApps,
+    appLimits: Object.entries(d.appLimits).map(([pkg, limitMinutes]) => ({ pkg, limitMinutes })),
+    locationEnabled: d.locationEnabled,
+  };
+  const childRules = state[childId].childRules;
   const today = todayKey();
-  const newBonus = (state[id].bonusMinutesToday || 0) + minutes;
-  state[id].bonusMinutesToday = newBonus;
+  if (childRules && childRules.bonusMinutes && childRules.bonusMinutes[today]) {
+    rules.bonusMinutes = { [today]: childRules.bonusMinutes[today] };
+  }
+  await fbPut(`${devicePath(childId, uid)}/rules`, rules);
+  d.hasOwnRules = true;
+}
+
+async function saveDeviceRule(cur, field, value, errorMsg) {
   render();
   try {
-    await fbPut(`families/${FAMILY_ID}/children/${id}/rules/bonusMinutes/${today}`, newBonus);
-    await fbPost(`families/${FAMILY_ID}/children/${id}/rewardEvents`, { minutes, timestamp: { ".sv": "timestamp" } });
-    await clearPendingExtensionRequests(id);
+    await ensureDeviceRules(cur.childId, cur.uid);
+    await fbPut(`${devicePath(cur.childId, cur.uid)}/rules/${field}`, value);
+  } catch {
+    showError(errorMsg);
+  }
+}
+
+// childId/uid là tuỳ chọn — cho phép thưởng giờ ngay từ banner "xin thêm giờ"
+// ở đầu trang (hiện cho MỌI máy của MỌI bé), không cần mở đúng máy đó trước.
+async function grantBonusMinutes(minutes, childId, uid) {
+  if (!childId) {
+    const cur = currentDevice();
+    if (!cur) return;
+    childId = cur.childId; uid = cur.uid;
+  }
+  const d = state[childId] && state[childId].devices[uid];
+  if (!d) return;
+  const today = todayKey();
+  const newBonus = (d.bonusMinutesToday || 0) + minutes;
+  d.bonusMinutesToday = newBonus;
+  render();
+  try {
+    await ensureDeviceRules(childId, uid);
+    await fbPut(`${devicePath(childId, uid)}/rules/bonusMinutes/${today}`, newBonus);
+    await fbPost(`${devicePath(childId, uid)}/rewardEvents`, { minutes, timestamp: { ".sv": "timestamp" } });
+    await clearPendingExtensionRequests(childId, uid);
     render();
   } catch {
     showError("Không thưởng được thời gian — kiểm tra kết nối Firebase.");
   }
 }
 
-async function dismissExtensionRequests(childId) {
-  await clearPendingExtensionRequests(childId);
+async function dismissExtensionRequests(childId, uid) {
+  await clearPendingExtensionRequests(childId, uid);
   render();
 }
 
 async function requestScreenshot() {
-  state[activeId].screenshotRequestedAt = "pending";
+  const cur = currentDevice();
+  if (!cur) return;
+  cur.d.screenshotRequestedAt = "pending";
   render();
   try {
-    const resolved = await fbPut(
-      `families/${FAMILY_ID}/children/${activeId}/commands/requestScreenshot`,
-      { ".sv": "timestamp" }
-    );
-    state[activeId].screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
+    const resolved = await fbPut(`${devicePath(cur.childId, cur.uid)}/commands/requestScreenshot`, { ".sv": "timestamp" });
+    cur.d.screenshotRequestedAt = resolved; // số nguyên do server Firebase gán, cùng "múi giờ" với timestamp ảnh
   } catch {
-    state[activeId].screenshotRequestedAt = null;
+    cur.d.screenshotRequestedAt = null;
     showError("Không gửi được yêu cầu chụp màn hình — kiểm tra kết nối Firebase.");
   }
   render();
 }
 
 async function saveDailyLimit() {
-  const input = document.getElementById("limitInput");
-  const val = parseInt(input.value, 10);
+  const cur = currentDevice();
+  if (!cur) return;
+  const val = parseInt(document.getElementById("limitInput").value, 10);
   if (isNaN(val) || val < 0) return;
-  state[activeId].dailyLimit = val;
-  render();
-  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/dailyLimitMinutes`, val); }
-  catch { showError("Không lưu được giới hạn giờ — kiểm tra kết nối Firebase."); }
+  cur.d.dailyLimit = val;
+  await saveDeviceRule(cur, "dailyLimitMinutes", val, "Không lưu được giới hạn giờ — kiểm tra kết nối Firebase.");
 }
 
 async function toggleBlockedApp(pkg) {
-  const list = state[activeId].blockedApps.slice();
+  const cur = currentDevice();
+  if (!cur) return;
+  const list = cur.d.blockedApps.slice();
   const idx = list.indexOf(pkg);
   if (idx >= 0) list.splice(idx, 1); else list.push(pkg);
-  state[activeId].blockedApps = list;
-  render();
-  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/blockedApps`, list); }
-  catch { showError("Không lưu được danh sách chặn — kiểm tra kết nối Firebase."); }
+  cur.d.blockedApps = list;
+  await saveDeviceRule(cur, "blockedApps", list, "Không lưu được danh sách chặn — kiểm tra kết nối Firebase.");
 }
 
 async function toggleLocationEnabled() {
-  const newVal = !state[activeId].locationEnabled;
-  state[activeId].locationEnabled = newVal;
-  render();
-  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/locationEnabled`, newVal); }
-  catch { showError("Không lưu được cài đặt định vị — kiểm tra kết nối Firebase."); }
+  const cur = currentDevice();
+  if (!cur) return;
+  cur.d.locationEnabled = !cur.d.locationEnabled;
+  await saveDeviceRule(cur, "locationEnabled", cur.d.locationEnabled, "Không lưu được cài đặt định vị — kiểm tra kết nối Firebase.");
 }
 
 async function addScheduleItem() {
@@ -743,83 +881,133 @@ async function deleteScheduleItem(id) {
 }
 
 function addCustomApp() {
+  const cur = currentDevice();
   const input = document.getElementById("customAppInput");
   const pkg = input.value.trim();
-  if (!pkg) return;
+  if (!cur || !pkg) return;
   input.value = "";
-  if (!state[activeId].blockedApps.includes(pkg)) toggleBlockedApp(pkg);
+  if (!cur.d.blockedApps.includes(pkg)) toggleBlockedApp(pkg);
 }
 
 async function saveAppLimits() {
-  const rows = document.querySelectorAll(".limit-input-field");
+  const cur = currentDevice();
+  if (!cur) return;
   const newLimits = {};
-  rows.forEach(inp => {
-    const pkg = inp.dataset.pkg;
+  document.querySelectorAll(".limit-input-field").forEach(inp => {
     const val = parseInt(inp.value, 10);
-    if (!isNaN(val) && val > 0) newLimits[pkg] = val;
+    if (!isNaN(val) && val > 0) newLimits[inp.dataset.pkg] = val;
   });
-  state[activeId].appLimits = newLimits;
-  render();
+  cur.d.appLimits = newLimits;
   const arr = Object.entries(newLimits).map(([pkg, limitMinutes]) => ({ pkg, limitMinutes }));
-  try { await fbPut(`families/${FAMILY_ID}/children/${activeId}/rules/appLimits`, arr); }
-  catch { showError("Không lưu được giới hạn theo app — kiểm tra kết nối Firebase."); }
+  await saveDeviceRule(cur, "appLimits", arr, "Không lưu được giới hạn theo app — kiểm tra kết nối Firebase.");
 }
 
-// Lấy yêu cầu "xin thêm giờ" đang chờ gần nhất của 1 bé (nếu có).
-function pendingExtensionFor(childId) {
-  const cs = state[childId];
-  if (!cs || !cs.extensionRequests) return null;
-  return cs.extensionRequests.filter(r => r.status === "pending").sort((a,b) => b.timestamp - a.timestamp)[0] || null;
+async function renameDevice() {
+  const cur = currentDevice();
+  if (!cur) return;
+  const name = prompt("Đặt tên cho thiết bị này (vd: Điện thoại cũ, Máy tính bảng):", deviceLabel(cur.d, cur.uid));
+  if (name === null) return;
+  cur.d.label = name.trim();
+  render();
+  try { await fbPut(`${devicePath(cur.childId, cur.uid)}/info/label`, cur.d.label || null); }
+  catch { showError("Không đổi được tên thiết bị — kiểm tra kết nối Firebase."); }
+}
+
+async function removeDevice() {
+  const cur = currentDevice();
+  if (!cur) return;
+  const meta = childrenMeta.find(c => c.id === cur.childId);
+  const label = deviceLabel(cur.d, cur.uid);
+  if (!confirm(`Xoá thiết bị "${label}" của ${meta ? meta.name : "bé"}?\n\n` +
+      "Máy này sẽ không còn được quản lý (hết giới hạn giờ, hết chặn ứng dụng) và dữ liệu riêng của máy sẽ bị xoá. " +
+      "Muốn quản lý lại thì cho bé nhập Mã gia đình trên máy đó và Duyệt lại.")) return;
+
+  // Thu hồi quyền trước: không còn approvedDevices/{uid} thì máy không đọc/ghi
+  // được dữ liệu của bé nữa, và app trên máy đó tự quay về màn hình ghép nối.
+  try {
+    await fbDelete(`families/${FAMILY_ID}/approvedDevices/${cur.uid}`);
+  } catch (e) {
+    console.error("Xoá approvedDevices thất bại:", e);
+    showError("Không xoá được thiết bị — kiểm tra kết nối Firebase.");
+    return;
+  }
+  delete approvedChildOf[cur.uid];
+  dismissedAt[cur.uid] = Number.MAX_SAFE_INTEGER;
+  // Yêu cầu ghép nối cũ của máy (pendingDevices — phụ huynh không xoá được do
+  // luật bảo mật) sẽ hiện lại thành "thiết bị mới" nếu không đánh dấu đã xử lý.
+  const path = rejectedDevicesPath(cur.uid);
+  if (path) {
+    await fbPut(path, { rejectedAt: { ".sv": "timestamp" }, reason: "removed" })
+      .catch(e => console.error("Ghi rejectedDevices thất bại:", e));
+  }
+  await fbDelete(devicePath(cur.childId, cur.uid)).catch(e => console.error("Xoá dữ liệu thiết bị thất bại:", e));
+
+  const cs = state[cur.childId];
+  delete cs.devices[cur.uid];
+  cs.deviceIds = cs.deviceIds.filter(u => u !== cur.uid);
+  activeDevice[cur.childId] = cs.deviceIds[0] || null;
+  render();
+}
+
+// Yêu cầu "xin thêm giờ" đang chờ gần nhất của 1 máy (nếu có).
+function pendingExtensionFor(d) {
+  if (!d || !d.extensionRequests) return null;
+  return d.extensionRequests.filter(r => r.status === "pending").sort((a,b) => b.timestamp - a.timestamp)[0] || null;
+}
+
+function childLastSeen(cs) {
+  const latest = Math.max(cs.legacyLastSeen || 0, ...Object.values(cs.devices).map(d => d.lastSeen || 0));
+  return latest || null;
 }
 
 function render() {
   document.getElementById("pendingDeviceBanner").innerHTML = pendingDevices.map(d => `
     <div class="pairing-banner">
-      <div class="pairing-banner-text">📱 Thiết bị mới xin ghép nối: ${d.childName}${d.childGrade ? " (" + d.childGrade + ")" : ""}</div>
+      <div class="pairing-banner-text">📱 Thiết bị mới xin ghép nối: ${esc(d.childName)}${d.childGrade ? " (" + esc(d.childGrade) + ")" : ""}</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap">
-        <button class="pill-btn" onclick="approveDevice('${d.deviceUid}', '${d.childName.replace(/'/g,"\\'")}', '${(d.childGrade||"").replace(/'/g,"\\'")}')">Duyệt</button>
+        <button class="pill-btn" onclick="approveDevice('${d.deviceUid}', '${esc((d.childName||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'"))}', '${esc((d.childGrade||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'"))}')">Duyệt</button>
         <button class="app-block-btn" onclick="rejectDevice('${d.deviceUid}')">Từ chối</button>
       </div>
     </div>
   `).join("");
 
-  // Banner "xin thêm giờ" hiển thị NGAY ĐẦU TRANG cho TẤT CẢ các bé, không
-  // chỉ riêng bé đang được chọn xem (activeId). Trước đây banner này chỉ nằm
-  // trong phần chi tiết của đúng 1 bé đang mở — nếu phụ huynh có nhiều bé và
-  // đang xem tab của bé khác lúc bé kia bấm "Xin thêm giờ", yêu cầu vẫn nằm
-  // đúng trên Firebase (ghi thành công) nhưng không có cách nào biết để mở
-  // đúng tab mà thấy — đây là nguyên nhân "máy con xin thêm giờ chưa hiện
-  // lên web" dù dữ liệu vẫn có trên Firebase.
+  // Banner "xin thêm giờ" ở ĐẦU TRANG cho MỌI máy của MỌI bé — không chỉ máy
+  // đang mở xem, để không bỏ sót yêu cầu của bé/máy khác.
   document.getElementById("globalExtensionBanner").innerHTML = childrenMeta.map(c => {
-    const req = pendingExtensionFor(c.id);
-    if (!req) return "";
-    return `
-    <div class="extension-banner">
-      <div class="extension-banner-text">🙋 ${c.name} xin thêm giờ lúc ${timeAgo(req.timestamp)}</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap">
-        <button class="pill-btn" onclick="grantBonusMinutes(15, '${c.id}')">Cho +15 phút</button>
-        <button class="pill-btn" onclick="grantBonusMinutes(30, '${c.id}')">Cho +30 phút</button>
-        <button class="app-block-btn" onclick="dismissExtensionRequests('${c.id}')">Bỏ qua</button>
-      </div>
-    </div>
-  `;
+    const cs = state[c.id];
+    return cs.deviceIds.map(uid => {
+      const d = cs.devices[uid];
+      const req = pendingExtensionFor(d);
+      if (!req) return "";
+      const who = cs.deviceIds.length > 1 ? `${esc(c.name)} (${esc(deviceLabel(d, uid))})` : esc(c.name);
+      return `
+      <div class="extension-banner">
+        <div class="extension-banner-text">🙋 ${who} xin thêm giờ lúc ${timeAgo(req.timestamp)}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="pill-btn" onclick="grantBonusMinutes(15, '${c.id}', '${uid}')">Cho +15 phút</button>
+          <button class="pill-btn" onclick="grantBonusMinutes(30, '${c.id}', '${uid}')">Cho +30 phút</button>
+          <button class="app-block-btn" onclick="dismissExtensionRequests('${c.id}', '${uid}')">Bỏ qua</button>
+        </div>
+      </div>`;
+    }).join("");
   }).join("");
 
   document.getElementById("kidSelector").innerHTML = childrenMeta.map(c => {
     const cs = state[c.id];
-    const online = cs.lastSeen && (Date.now() - cs.lastSeen) < ONLINE_THRESHOLD_MS;
-    const statusText = cs.lastSeen
-      ? (online ? "Đang online" : "Offline · " + timeAgo(cs.lastSeen))
+    const lastSeen = childLastSeen(cs);
+    const online = isOnline(lastSeen);
+    const statusText = lastSeen
+      ? (online ? "Đang online" : "Offline · " + timeAgo(lastSeen))
       : "Chưa có tín hiệu";
-    const hasPendingExtension = !!pendingExtensionFor(c.id);
+    const hasPendingExtension = cs.deviceIds.some(uid => pendingExtensionFor(cs.devices[uid]));
     return `
     <button class="kid-btn ${c.id===activeId?'active':''}"
       style="border-color:${c.id===activeId ? c.color : 'transparent'}"
       onclick="selectKid('${c.id}')">
-      <span class="avatar" style="background:${c.bg};color:${c.color}; position:relative">${c.name[0]}${hasPendingExtension ? '<span style="position:absolute; top:-2px; right:-2px; width:12px; height:12px; border-radius:50%; background:#FF7A59; border:2px solid white"></span>' : ''}</span>
+      <span class="avatar" style="background:${c.bg};color:${c.color}; position:relative">${esc(c.name[0])}${hasPendingExtension ? '<span style="position:absolute; top:-2px; right:-2px; width:12px; height:12px; border-radius:50%; background:#FF7A59; border:2px solid white"></span>' : ''}</span>
       <span>
-        <div class="kid-name">${c.name}</div>
-        <div class="kid-grade">${c.grade}</div>
+        <div class="kid-name">${esc(c.name)}</div>
+        <div class="kid-grade">${esc(c.grade)}${cs.deviceIds.length > 1 ? ` · ${cs.deviceIds.length} thiết bị` : ""}</div>
         <div class="status-line" style="color:${online ? '#2F9E8F' : '#B0BAC2'}">
           <span class="status-dot" style="background:${online ? '#2F9E8F' : '#B0BAC2'}"></span>${statusText}
         </div>
@@ -836,7 +1024,80 @@ function render() {
   document.getElementById("childDetailSections").style.display = "block";
 
   const meta = childrenMeta.find(c => c.id === activeId);
-  const s = state[activeId];
+  const cs = state[activeId];
+  const cur = currentDevice();
+
+  // ----- Chọn thiết bị -----
+  const devicesLastSeen = Math.max(0, ...Object.values(cs.devices).map(d => d.lastSeen || 0));
+  const legacyRecent = cs.legacyLastSeen && cs.legacyLastSeen > devicesLastSeen
+    && (Date.now() - cs.legacyLastSeen) < 2 * 24 * 60 * 60 * 1000;
+  document.getElementById("deviceSelector").innerHTML = `
+    <div class="device-selector-title">Thiết bị của ${esc(meta.name)}</div>
+    ${cs.deviceIds.length ? `<div class="device-chips">${cs.deviceIds.map(uid => {
+      const d = cs.devices[uid];
+      const on = isOnline(d.lastSeen);
+      return `<button class="device-chip ${uid === activeDevice[activeId] ? 'active' : ''}" onclick="selectDevice('${uid}')">
+        <span class="status-dot" style="background:${on ? '#2F9E8F' : '#B0BAC2'}"></span>${esc(deviceLabel(d, uid))}
+        <span class="device-chip-status">${d.lastSeen ? (on ? "Đang online" : timeAgo(d.lastSeen)) : "Chưa có tín hiệu"}</span>
+      </button>`;
+    }).join("")}</div>`
+    : `<div class="muted">${esc(meta.name)} chưa có thiết bị nào. Cho bé nhập Mã gia đình trong app Sổ Bé Ngoan trên máy của bé, rồi bấm Duyệt ở đây.</div>`}
+    ${legacyRecent ? `<div class="muted">Có máy của ${esc(meta.name)} vẫn chạy bản app cũ (tín hiệu cuối ${timeAgo(cs.legacyLastSeen)}). Cài bản app mới cho máy đó để xem và quản lý riêng từng máy.</div>` : ""}
+  `;
+  document.getElementById("sharedHeading").textContent = `Chung cho ${meta.name} (mọi thiết bị)`;
+
+  // ----- Phần chung của bé -----
+  document.getElementById("points").textContent = cs.points;
+
+  // schedule — hiện dạng tab theo từng thứ, mặc định chọn đúng hôm nay
+  const dayTabs = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const dayLabels = { T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
+  const today = todayDayCode();
+
+  document.getElementById("scheduleTabs").innerHTML = dayTabs.map(day => `
+    <button class="schedule-day-tab ${day===selectedScheduleDay ? 'active' : ''} ${day===today ? 'today' : ''}"
+      onclick="selectScheduleDay('${day}')">${dayLabels[day]}${day===today ? ' • Hôm nay' : ''}</button>
+  `).join("");
+
+  const itemsForSelectedDay = cs.schedule
+    .filter(it => it.day === selectedScheduleDay || it.day === "daily")
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  let currentIdx = -1;
+  if (selectedScheduleDay === today) {
+    const nowStr = String(new Date().getHours()).padStart(2,"0") + ":" + String(new Date().getMinutes()).padStart(2,"0");
+    itemsForSelectedDay.forEach((it, i) => { if (it.time <= nowStr) currentIdx = i; });
+  }
+
+  document.getElementById("scheduleList").innerHTML = itemsForSelectedDay.length
+    ? itemsForSelectedDay.map((it, i) => `
+        <div class="schedule-item ${i === currentIdx ? 'current' : ''}">
+          ${i === currentIdx ? '<span class="schedule-now-tag">ĐANG DIỄN RA</span>' : ''}
+          <span class="schedule-time">${it.time}</span>
+          <span class="schedule-title">${it.title}${it.day === "daily" ? ' <span class="muted" style="display:inline">(hằng ngày)</span>' : ''}</span>
+          <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
+        </div>
+      `).join("")
+    : `<div class="muted">Chưa có lịch nào cho ${dayLabels[selectedScheduleDay]} — thêm hoạt động ở trên.</div>`;
+
+  // messages
+  document.getElementById("msgList").innerHTML = cs.messages.map(m => `
+    <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
+      style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
+  `).join("");
+
+  // ----- Phần riêng của thiết bị đang xem -----
+  document.getElementById("deviceSections").style.display = cur ? "block" : "none";
+  if (!cur) return;
+  const s = cur.d;
+
+  document.getElementById("deviceActions").innerHTML = `
+    <button class="pill-btn" onclick="renameDevice()">✏️ Đổi tên</button>
+    <button class="app-block-btn blocked" onclick="removeDevice()">🗑 Xoá thiết bị</button>
+  `;
+  document.getElementById("deviceRulesNote").textContent = s.hasOwnRules
+    ? `Áp dụng riêng cho máy "${deviceLabel(s, cur.uid)}".`
+    : `Máy "${deviceLabel(s, cur.uid)}" đang dùng giới hạn chung của bé. Sửa ở đây sẽ thành giới hạn riêng của máy này.`;
 
   // usage (giới hạn hiệu lực = giới hạn gốc + giờ được thưởng hôm nay)
   const effectiveLimit = s.dailyLimit + (s.bonusMinutesToday || 0);
@@ -844,7 +1105,7 @@ function render() {
   document.getElementById("limitLine").textContent = s.bonusMinutesToday > 0
     ? `/ ${effectiveLimit} phút (gồm +${s.bonusMinutesToday}p thưởng)`
     : `/ ${effectiveLimit} phút`;
-  const pct = Math.min((s.usedToday / effectiveLimit) * 100, 100);
+  const pct = effectiveLimit > 0 ? Math.min((s.usedToday / effectiveLimit) * 100, 100) : 100;
   const bar = document.getElementById("usageBar");
   bar.style.width = pct + "%";
   bar.style.background = pct > 90 ? "#FF7A59" : meta.color;
@@ -855,13 +1116,9 @@ function render() {
     ? `Đã thưởng hôm nay: +${s.bonusMinutesToday} phút`
     : "Chưa thưởng thêm giờ nào hôm nay";
 
-  // Banner "xin thêm giờ" của bé đang xem giờ đã gộp vào globalExtensionBanner
-  // ở đầu trang (hiện cho MỌI bé, không riêng bé đang mở) — xem render() phía
-  // trên. Giữ lại div rỗng này để không phải sửa layout/CSS xung quanh.
+  // Banner "xin thêm giờ" của máy đang xem đã gộp vào globalExtensionBanner ở
+  // đầu trang. Giữ lại div rỗng này để không phải sửa layout/CSS xung quanh.
   document.getElementById("extensionRequestBanner").innerHTML = "";
-
-  // points
-  document.getElementById("points").textContent = s.points;
 
   // device info
   const dev = s.device;
@@ -869,8 +1126,8 @@ function render() {
     <div class="device-info-grid">
       <div class="device-info-item">
         <div class="device-info-label">Thiết bị</div>
-        <div class="device-info-value">${dev.model || "—"}</div>
-        <div class="muted">${dev.androidVersion || ""}</div>
+        <div class="device-info-value">${esc(dev.model || "—")}</div>
+        <div class="muted">${esc(dev.androidVersion || "")}</div>
       </div>
       <div class="device-info-item">
         <div class="device-info-label">Pin</div>
@@ -888,7 +1145,7 @@ function render() {
         </div>
       </div>
     </div>
-  ` : `<div class="muted">Chưa có dữ liệu thiết bị — đợi máy con hoạt động vài phút rồi refresh lại.</div>`;
+  ` : `<div class="muted">Chưa có dữ liệu từ máy này. Nếu máy đang dùng: kiểm tra đã cài bản app mới và đã bật Trợ năng cho Sổ Bé Ngoan.</div>`;
 
   // current app
   const ca = s.currentApp;
@@ -917,7 +1174,7 @@ function render() {
       `<div class="muted">Đã gửi yêu cầu — máy con cần đang mở màn hình và có mạng để chụp được. Có thể mất khoảng 1 phút.</div>`;
   } else if (shot) {
     document.getElementById("screenshotInfo").innerHTML = `
-      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" onclick="openLightbox(state[activeId].screenshot.imageBase64)" />
+      <img class="screenshot-img" src="data:image/jpeg;base64,${shot.imageBase64}" onclick="openLightbox(currentDevice().d.screenshot.imageBase64)" />
       <div class="muted" style="margin-top:2px">Bấm vào ảnh để phóng to</div>
       <div class="muted" style="margin-top:6px">Chụp lúc: ${timeAgo(shot.timestamp)}</div>
     `;
@@ -948,37 +1205,6 @@ function render() {
     document.getElementById("locationInfo").innerHTML =
       `<div class="muted">Đã bật định vị — đang đợi máy con gửi vị trí đầu tiên (có thể mất vài phút).</div>`;
   }
-
-  // schedule — hiện dạng tab theo từng thứ, mặc định chọn đúng hôm nay
-  const dayTabs = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-  const dayLabels = { T2: "Thứ 2", T3: "Thứ 3", T4: "Thứ 4", T5: "Thứ 5", T6: "Thứ 6", T7: "Thứ 7", CN: "Chủ nhật" };
-  const today = todayDayCode();
-
-  document.getElementById("scheduleTabs").innerHTML = dayTabs.map(day => `
-    <button class="schedule-day-tab ${day===selectedScheduleDay ? 'active' : ''} ${day===today ? 'today' : ''}"
-      onclick="selectScheduleDay('${day}')">${dayLabels[day]}${day===today ? ' • Hôm nay' : ''}</button>
-  `).join("");
-
-  const itemsForSelectedDay = s.schedule
-    .filter(it => it.day === selectedScheduleDay || it.day === "daily")
-    .sort((a,b) => a.time.localeCompare(b.time));
-
-  let currentIdx = -1;
-  if (selectedScheduleDay === today) {
-    const nowStr = String(new Date().getHours()).padStart(2,"0") + ":" + String(new Date().getMinutes()).padStart(2,"0");
-    itemsForSelectedDay.forEach((it, i) => { if (it.time <= nowStr) currentIdx = i; });
-  }
-
-  document.getElementById("scheduleList").innerHTML = itemsForSelectedDay.length
-    ? itemsForSelectedDay.map((it, i) => `
-        <div class="schedule-item ${i === currentIdx ? 'current' : ''}">
-          ${i === currentIdx ? '<span class="schedule-now-tag">ĐANG DIỄN RA</span>' : ''}
-          <span class="schedule-time">${it.time}</span>
-          <span class="schedule-title">${it.title}${it.day === "daily" ? ' <span class="muted" style="display:inline">(hằng ngày)</span>' : ''}</span>
-          <button class="schedule-del" onclick="deleteScheduleItem('${it.id}')">✕</button>
-        </div>
-      `).join("")
-    : `<div class="muted">Chưa có lịch nào cho ${dayLabels[selectedScheduleDay]} — thêm hoạt động ở trên.</div>`;
 
   // daily limit input (skip overwrite while user is typing)
   const limitInput = document.getElementById("limitInput");
@@ -1041,15 +1267,22 @@ function render() {
   document.getElementById("alertList").innerHTML = s.alerts.map(a => `
     <div class="alert-item">${a.label} · <span style="color:#B0BAC2">${a.time}</span></div>
   `).join("");
-
-  // messages
-  document.getElementById("msgList").innerHTML = s.messages.map(m => `
-    <div class="msg-bubble ${m.from==='parent' ? 'msg-parent' : 'msg-child'}"
-      style="${m.from==='parent' ? 'background:'+meta.color : ''}">${m.text}</div>
-  `).join("");
 }
 
-function selectKid(id) { activeId = id; render(); }
+// Đổi bé/thiết bị thì tải ngay chi tiết (giờ dùng, ảnh chụp...) của máy vừa
+// chọn, không bắt ba mẹ đợi tới lần làm mới 5 giây tiếp theo.
+function selectKid(id) {
+  activeId = id;
+  render();
+  const meta = childrenMeta.find(c => c.id === id);
+  if (meta) refreshChild(meta);
+}
+
+function selectDevice(uid) {
+  activeDevice[activeId] = uid;
+  render();
+  refreshDevice(activeId, uid, true).then(render);
+}
 
 document.getElementById("sendBtn").addEventListener("click", sendMessage);
 document.getElementById("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
@@ -1062,10 +1295,9 @@ document.getElementById("scheduleTitleInput").addEventListener("keydown", e => {
 document.getElementById("requestScreenshotBtn").addEventListener("click", requestScreenshot);
 
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
-// Danh sách thiết bị đã Từ chối lưu ở users/{uid}/rejectedDevices của phụ
-// huynh — nơi phụ huynh vừa ĐỌC vừa GHI được. Trước đây lưu ở
-// families/{id}/meta/rejectedDeviceUids: ghi được nhưng node "meta" KHÔNG có
-// luật .read, nên lúc F5 đọc lại bị chặn và các dòng đã Từ chối hiện lại.
+// Thiết bị đã Từ chối hoặc đã Xoá được ghi ở users/{uid}/rejectedDevices của
+// phụ huynh — nơi phụ huynh vừa ĐỌC vừa GHI được (node "meta" không có luật
+// .read, ghi vào đó thì F5 xong không đọc lại được).
 function rejectedDevicesPath(deviceUid) {
   const session = getSession();
   if (!session || !session.uid) return null;
@@ -1081,30 +1313,30 @@ async function fetchPendingDevices() {
         ? fbGet(rejectedPath).catch(e => { console.error("Tải rejectedDevices thất bại:", e); return null; })
         : Promise.resolve(null)
     ]);
-    Object.keys(rejectedData || {}).forEach(uid => rejectedDeviceUids.add(uid));
+    Object.entries(rejectedData || {}).forEach(([uid, v]) => {
+      if (v && typeof v.rejectedAt === "number") dismissedAt[uid] = v.rejectedAt;
+    });
+    const isDismissed = (uid, v) => dismissedAt[uid] && (v.requestedAt || 0) <= dismissedAt[uid];
+    const entries = Object.entries(data || {}).filter(([uid, v]) => !isDismissed(uid, v));
 
-    // Luật bảo mật chỉ cho phụ huynh đọc TỪNG approvedDevices/{deviceUid}, không
-    // đọc được cả node approvedDevices (không có .read ở cấp đó) — trước đây
-    // đọc cả node bị chặn âm thầm, nên sau khi F5 các dòng đã Duyệt hiện lại.
-    // Giờ hỏi riêng từng thiết bị đang chờ; đã biết là duyệt rồi thì nhớ vào
-    // approvedDeviceUids để lần làm mới sau (mỗi 5 giây) không hỏi lại nữa.
-    const unknown = Object.keys(data || {})
-      .filter(uid => !approvedDeviceUids.has(uid) && !rejectedDeviceUids.has(uid));
+    // Hỏi riêng từng approvedDevices/{uid} (luật bảo mật không cho đọc cả
+    // node). Đã biết là duyệt rồi thì nhớ lại, lần làm mới sau không hỏi nữa.
+    const unknown = entries.map(([uid]) => uid).filter(uid => !(uid in approvedChildOf));
     const approvals = await Promise.all(unknown.map(uid =>
       fbGet(`families/${FAMILY_ID}/approvedDevices/${uid}`).catch(e => {
         console.error(`Kiểm tra approvedDevices/${uid} thất bại:`, e);
         return null;
       })
     ));
-    unknown.forEach((uid, i) => { if (approvals[i] && approvals[i].childId) approvedDeviceUids.add(uid); });
+    unknown.forEach((uid, i) => {
+      if (approvals[i] && approvals[i].childId && !dismissedAt[uid]) approvedChildOf[uid] = approvals[i].childId;
+    });
 
-    pendingDevices = data
-      ? Object.entries(data)
-          .filter(([deviceUid]) => !approvedDeviceUids.has(deviceUid) && !rejectedDeviceUids.has(deviceUid))
-          .map(([deviceUid, v]) => ({
-            deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
-          }))
-      : [];
+    pendingDevices = entries
+      .filter(([uid]) => !(uid in approvedChildOf))
+      .map(([deviceUid, v]) => ({
+        deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
+      }));
   } catch (e) {
     console.error("Tải pendingDevices thất bại:", e);
     pendingDevices = [];
@@ -1114,12 +1346,9 @@ async function fetchPendingDevices() {
 async function approveDevice(deviceUid, childName, childGrade) {
   const childId = slugifyName(childName);
 
-  // Bỏ dòng "Duyệt" khỏi giao diện ngay lập tức — không chờ các lệnh ghi
-  // Firebase bên dưới, vì nếu một trong số đó bị chặn (ví dụ luật bảo mật
-  // không cho phép xoá pendingDevices của thiết bị khác) thì trước đây cả
-  // hàm dừng giữa chừng và dòng "Duyệt" bị kẹt lại trên dashboard mãi,
-  // dù máy con đã ghép nối thành công.
-  approvedDeviceUids.add(deviceUid);
+  // Bỏ dòng "Duyệt" khỏi giao diện ngay lập tức, không chờ ghi Firebase.
+  approvedChildOf[deviceUid] = childId;
+  delete dismissedAt[deviceUid];
   pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
   render();
 
@@ -1128,7 +1357,7 @@ async function approveDevice(deviceUid, childName, childGrade) {
   } catch (e) {
     console.error("Ghi approvedDevices thất bại:", e);
     showError("Không duyệt được thiết bị — kiểm tra kết nối Firebase.");
-    approvedDeviceUids.delete(deviceUid);
+    delete approvedChildOf[deviceUid];
     await fetchPendingDevices();
     render();
     return;
@@ -1140,27 +1369,26 @@ async function approveDevice(deviceUid, childName, childGrade) {
     console.error("Ghi hồ sơ bé thất bại:", e);
   }
 
+  // Tạo sẵn node của máy để máy hiện ngay trong danh sách thiết bị của bé.
   try {
-    await fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`);
+    await fbPut(`${devicePath(childId, deviceUid)}/info/approvedAt`, { ".sv": "timestamp" });
   } catch (e) {
-    // Không chặn UI vì hàng chờ (pendingDevices) đã bị lọc bỏ ở phía dashboard
-    // theo approvedDeviceUids phía trên — nhưng vẫn log lại để biết luật bảo
-    // mật Firebase có đang chặn xoá pendingDevices hay không.
-    console.error("Xoá pendingDevices thất bại (có thể do luật bảo mật) — dòng vẫn không tái xuất hiện vì đã lọc theo approvedDeviceUids:", e);
+    console.error("Tạo node thiết bị thất bại:", e);
   }
 
+  activeId = childId;
+  activeDevice[childId] = deviceUid;
   await refreshAll();
 }
 
 async function rejectDevice(deviceUid) {
   // Ẩn dòng ngay lập tức, giống approveDevice() — không chờ ghi Firebase.
-  rejectedDeviceUids.add(deviceUid);
+  dismissedAt[deviceUid] = Number.MAX_SAFE_INTEGER;
   pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
   render();
 
   // Phụ huynh không xoá được pendingDevices/{deviceUid} của thiết bị khác
-  // (luật bảo mật), nên ghi lại thiết bị đã Từ chối vào chỗ của chính phụ
-  // huynh (xem rejectedDevicesPath) để ẩn vĩnh viễn kể cả sau khi F5.
+  // (luật bảo mật), nên ghi lại là đã Từ chối (xem rejectedDevicesPath).
   const path = rejectedDevicesPath(deviceUid);
   try {
     if (!path) throw new Error("Thiếu uid phụ huynh trong phiên đăng nhập");
@@ -1168,7 +1396,7 @@ async function rejectDevice(deviceUid) {
   } catch (e) {
     console.error("Ghi rejectedDevices thất bại:", e);
     showError("Không từ chối được yêu cầu — kiểm tra kết nối Firebase.");
-    rejectedDeviceUids.delete(deviceUid);
+    delete dismissedAt[deviceUid];
     await fetchPendingDevices();
     render();
   }
@@ -1177,10 +1405,15 @@ async function rejectDevice(deviceUid) {
 async function discoverChildren() {
   if (!FAMILY_ID) return;
   try {
-    const childrenData = await fbGet(`families/${FAMILY_ID}/children`);
-    const ids = childrenData ? Object.keys(childrenData) : [];
+    // shallow: chỉ lấy danh sách childId — tải cả node children sẽ kéo theo
+    // toàn bộ lịch sử giờ dùng và ảnh chụp của mọi máy.
+    const childKeys = await fbGet(`families/${FAMILY_ID}/children`, "shallow=true");
+    const ids = Object.keys(childKeys || {});
+    const profiles = await Promise.all(ids.map(id =>
+      fbGet(`families/${FAMILY_ID}/children/${id}/profile`).catch(() => null)
+    ));
     childrenMeta = ids.map((id, i) => {
-      const profile = (childrenData[id] && childrenData[id].profile) || {};
+      const profile = profiles[i] || {};
       const c = CHILD_COLORS[i % CHILD_COLORS.length];
       return { id, name: profile.name || id, grade: profile.grade || "", color: c.color, bg: c.bg };
     });

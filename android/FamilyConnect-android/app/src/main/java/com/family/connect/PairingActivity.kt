@@ -69,7 +69,7 @@ class PairingActivity : AppCompatActivity() {
     private fun listenForApproval(familyCode: String, deviceUid: String) {
         FirebaseSyncManager.listenForPairingApproval(familyCode, deviceUid) { childId ->
             runOnUiThread {
-                PairingPrefs.savePairing(this, familyCode, childId)
+                PairingPrefs.savePairing(this, familyCode, childId, deviceUid)
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }

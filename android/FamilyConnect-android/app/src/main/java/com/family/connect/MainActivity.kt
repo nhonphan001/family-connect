@@ -69,6 +69,15 @@ class MainActivity : AppCompatActivity() {
             binding.rewardPointsText.text = getString(R.string.reward_points_format, points)
         }
 
+        FirebaseSyncManager.listenForDeviceRemoved(this) {
+            runOnUiThread {
+                PairingPrefs.clearPairing(this)
+                Toast.makeText(this, "Ba mẹ đã gỡ máy này khỏi Sổ Bé Ngoan.", Toast.LENGTH_LONG).show()
+                startActivity(Intent(this, PairingActivity::class.java))
+                finish()
+            }
+        }
+
         FirebaseSyncManager.listenForMessagesFromParent(this) { text ->
             binding.latestMessageText.text = text
         }

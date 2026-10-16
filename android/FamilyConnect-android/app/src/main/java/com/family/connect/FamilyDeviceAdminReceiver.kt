@@ -17,6 +17,6 @@ class FamilyDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
         // Thông báo cho phụ huynh qua Firebase nếu quyền admin bị tắt bất thường
-        FirebaseSyncManager.reportAdminDisabled(context)
+        if (PairingPrefs.isPaired(context)) FirebaseSyncManager.reportAdminDisabled(context)
     }
 }

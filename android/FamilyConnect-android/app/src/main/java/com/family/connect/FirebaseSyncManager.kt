@@ -12,6 +12,12 @@ import com.google.firebase.database.ValueEventListener
  * Cầu nối 2 chiều giữa app trên máy con và dashboard web của phụ huynh, qua
  * Firebase Realtime Database. Family ID và Child ID không còn hard-code nữa —
  * được lấy từ PairingPrefs (đã nhập lúc ghép nối bằng Mã gia đình).
+ *
+ * Một bé có thể dùng nhiều máy, nên dữ liệu chia 2 chỗ:
+ *  - children/{childId}/...: chung cho bé (hồ sơ, điểm, lịch, tin nhắn).
+ *  - children/{childId}/devices/{deviceUid}/...: riêng từng máy (online, thông
+ *    tin máy, giờ dùng, giới hạn/chặn app, ảnh chụp, vị trí, xin thêm giờ).
+ *    Trước đây 2 máy cùng tên bé ghi đè lên nhau ở cùng một chỗ.
  */
 object FirebaseSyncManager {
 
@@ -32,6 +38,29 @@ object FirebaseSyncManager {
     private fun childRef(context: Context) = db.getReference(
         "families/${PairingPrefs.getFamilyId(context)}/children/${PairingPrefs.getChildId(context)}"
     )
+
+    private fun deviceRef(context: Context) =
+        childRef(context).child("devices").child(PairingPrefs.getDeviceUid(context))
+
+    /**
+     * Gọi onRemoved khi ba mẹ bấm "Xoá thiết bị" trên dashboard (node
+     * approvedDevices/{deviceUid} bị xoá). Từ lúc đó máy không còn quyền đọc/ghi
+     * dữ liệu của bé nữa, nên app phải quên ghép nối và quay về màn hình nhập mã.
+     */
+    fun listenForDeviceRemoved(context: Context, onRemoved: () -> Unit): ValueEventListener? {
+        val familyId = PairingPrefs.getFamilyId(context)
+        val deviceUid = PairingPrefs.getDeviceUid(context)
+        if (familyId.isBlank() || deviceUid.isBlank()) return null
+        val ref = db.getReference("families/$familyId/approvedDevices/$deviceUid")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) onRemoved()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        ref.addValueEventListener(listener)
+        return listener
+    }
 
     /** Ghi tên + lớp của bé một lần lúc ghép nối, để dashboard tự hiện tên đẹp thay vì ID thô. */
     fun saveProfile(context: Context, name: String, grade: String) {
@@ -81,29 +110,46 @@ object FirebaseSyncManager {
     private fun todayDateStr(): String =
         java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
 
+    private fun parseRules(snapshot: DataSnapshot?): Rules {
+        val limit = snapshot?.child("dailyLimitMinutes")?.getValue(Int::class.java) ?: 120
+        val blocked = snapshot?.child("blockedApps")?.children
+            ?.mapNotNull { it.getValue(String::class.java) }
+            ?.toSet() ?: emptySet()
+        val appLimits = snapshot?.child("appLimits")?.children?.mapNotNull { entry ->
+            val pkg = entry.child("pkg").getValue(String::class.java)
+            val minutes = entry.child("limitMinutes").getValue(Int::class.java)
+            if (pkg != null && minutes != null) pkg to minutes else null
+        }?.toMap() ?: emptyMap()
+        val locationEnabled = snapshot?.child("locationEnabled")?.getValue(Boolean::class.java) ?: false
+        val bonus = snapshot?.child("bonusMinutes")?.child(todayDateStr())?.getValue(Int::class.java) ?: 0
+        return Rules(limit, blocked, appLimits, locationEnabled, bonus)
+    }
+
+    /**
+     * Giới hạn/chặn app của RIÊNG máy này (devices/{deviceUid}/rules). Máy chưa
+     * được ba mẹ cài đặt riêng thì dùng tạm giới hạn chung của bé
+     * (children/{childId}/rules) — là chỗ bản app cũ vẫn dùng.
+     */
     fun listenForRules(context: Context, onRulesChanged: (Rules) -> Unit) {
+        var childRules: DataSnapshot? = null
+        var deviceRules: DataSnapshot? = null
+        fun emit() {
+            val effective = if (deviceRules?.exists() == true) deviceRules else childRules
+            onRulesChanged(parseRules(effective))
+        }
         childRef(context).child("rules").addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val limit = snapshot.child("dailyLimitMinutes").getValue(Int::class.java) ?: 120
-                val blocked = snapshot.child("blockedApps").children
-                    .mapNotNull { it.getValue(String::class.java) }
-                    .toSet()
-                val appLimits = snapshot.child("appLimits").children.mapNotNull { entry ->
-                    val pkg = entry.child("pkg").getValue(String::class.java)
-                    val minutes = entry.child("limitMinutes").getValue(Int::class.java)
-                    if (pkg != null && minutes != null) pkg to minutes else null
-                }.toMap()
-                val locationEnabled = snapshot.child("locationEnabled").getValue(Boolean::class.java) ?: false
-                val bonus = snapshot.child("bonusMinutes").child(todayDateStr()).getValue(Int::class.java) ?: 0
-                onRulesChanged(Rules(limit, blocked, appLimits, locationEnabled, bonus))
-            }
+            override fun onDataChange(snapshot: DataSnapshot) { childRules = snapshot; emit() }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+        deviceRef(context).child("rules").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) { deviceRules = snapshot; emit() }
             override fun onCancelled(error: DatabaseError) {}
         })
     }
 
     fun syncUsage(context: Context, date: String, usage: List<UsageStatsHelper.AppUsage>) {
         val updates = usage.associate { it.packageName.replace(".", "_") to it.minutesToday }
-        childRef(context).child("usage").child(date).updateChildren(updates)
+        deviceRef(context).child("usage").child(date).updateChildren(updates)
     }
 
     fun reportBlockedAttempt(context: Context, packageName: String, overDailyLimit: Boolean) {
@@ -112,7 +158,7 @@ object FirebaseSyncManager {
             "packageName" to packageName,
             "timestamp" to System.currentTimeMillis()
         )
-        childRef(context).child("alerts").push().setValue(alert)
+        deviceRef(context).child("alerts").push().setValue(alert)
     }
 
     fun reportAppLimitReached(context: Context, packageName: String) {
@@ -121,7 +167,7 @@ object FirebaseSyncManager {
             "packageName" to packageName,
             "timestamp" to System.currentTimeMillis()
         )
-        childRef(context).child("alerts").push().setValue(alert)
+        deviceRef(context).child("alerts").push().setValue(alert)
     }
 
     fun reportLocation(context: Context, lat: Double, lng: Double) {
@@ -130,7 +176,7 @@ object FirebaseSyncManager {
             "lng" to lng,
             "timestamp" to System.currentTimeMillis()
         )
-        childRef(context).child("location").setValue(data)
+        deviceRef(context).child("location").setValue(data)
     }
 
     /** Lịch học/sinh hoạt do phụ huynh đặt trên dashboard, lọc theo "hôm nay" ở phía app. */
@@ -150,7 +196,7 @@ object FirebaseSyncManager {
     }
 
     fun reportAdminDisabled(context: Context) {
-        childRef(context).child("alerts").push().setValue(
+        deviceRef(context).child("alerts").push().setValue(
             mapOf("type" to "ADMIN_DISABLED", "timestamp" to System.currentTimeMillis())
         )
     }
@@ -161,7 +207,7 @@ object FirebaseSyncManager {
     }
 
     fun reportHeartbeat(context: Context) {
-        childRef(context).child("status").child("lastSeen").setValue(System.currentTimeMillis())
+        deviceRef(context).child("status").child("lastSeen").setValue(System.currentTimeMillis())
     }
 
     fun reportDeviceInfo(context: Context) {
@@ -174,18 +220,18 @@ object FirebaseSyncManager {
             "storageTotalGB" to info.storageTotalGB,
             "timestamp" to System.currentTimeMillis()
         )
-        childRef(context).child("device").setValue(data)
+        deviceRef(context).child("device").setValue(data)
     }
 
     /** Ứng dụng đang mở ngay lúc này — để dashboard hiện "Đang dùng: ...". */
     fun reportCurrentApp(context: Context, packageName: String) {
         val data = mapOf("packageName" to packageName, "timestamp" to System.currentTimeMillis())
-        childRef(context).child("status").child("currentApp").setValue(data)
+        deviceRef(context).child("status").child("currentApp").setValue(data)
     }
 
     /** Phụ huynh bấm "Chụp màn hình" trên dashboard sẽ ghi timestamp vào đây. */
     fun listenForScreenshotRequest(context: Context, onRequest: (Long) -> Unit) {
-        childRef(context).child("commands").child("requestScreenshot")
+        deviceRef(context).child("commands").child("requestScreenshot")
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val ts = snapshot.getValue(Long::class.java) ?: return
@@ -197,13 +243,13 @@ object FirebaseSyncManager {
 
     fun uploadScreenshot(context: Context, base64Jpeg: String) {
         val data = mapOf("imageBase64" to base64Jpeg, "timestamp" to ServerValue.TIMESTAMP)
-        childRef(context).child("screenshot").setValue(data)
+        deviceRef(context).child("screenshot").setValue(data)
     }
 
     /** Bé bấm "Xin thêm giờ" trên app — ba mẹ thấy yêu cầu này trên dashboard. */
     fun requestExtension(context: Context) {
         val data = mapOf("timestamp" to ServerValue.TIMESTAMP, "status" to "pending")
-        childRef(context).child("extensionRequests").push().setValue(data)
+        deviceRef(context).child("extensionRequests").push().setValue(data)
     }
 
     /**
@@ -215,7 +261,7 @@ object FirebaseSyncManager {
         if (!prefs.contains("last_bonus_ts")) {
             prefs.edit().putLong("last_bonus_ts", System.currentTimeMillis()).apply()
         }
-        childRef(context).child("rewardEvents").addChildEventListener(object : ChildEventListener {
+        deviceRef(context).child("rewardEvents").addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val ts = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
                 val minutes = snapshot.child("minutes").getValue(Int::class.java) ?: 0

@@ -36,6 +36,9 @@ class AppMonitorAccessibilityService : AccessibilityService() {
     private var lastBlockedAppNoticeTime = 0L
     private var lastAppLimitNoticeTime = 0L
 
+    /** familyId/childId/deviceUid mà các listener Firebase đang nghe — đổi thì nghe lại. */
+    private var listeningFor: String? = null
+
     /**
      * Package(s) của launcher/màn hình chính trên máy. Trước đây launcher KHÔNG
      * được coi là ngoại lệ như "chính app của mình", nên mỗi sự kiện cửa sổ từ
@@ -64,6 +67,21 @@ class AppMonitorAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        startListeningIfPaired()
+    }
+
+    /**
+     * Chỉ nghe Firebase khi máy đã ghép nối. Dịch vụ thường được bật TRƯỚC khi
+     * ghép nối xong (hoặc máy vừa được ghép nối lại sau khi ba mẹ xoá thiết bị),
+     * nên hàm này được gọi lại ở mỗi sự kiện, và tự nghe lại khi ghép nối đổi.
+     */
+    private fun startListeningIfPaired() {
+        if (!PairingPrefs.isPaired(this)) return
+        val key = "${PairingPrefs.getFamilyId(this)}/${PairingPrefs.getChildId(this)}/${PairingPrefs.getDeviceUid(this)}"
+        if (key == listeningFor) return
+        listeningFor = key
+
+        FirebaseSyncManager.listenForDeviceRemoved(this) { onDeviceRemoved() }
         FirebaseSyncManager.listenForRules(this) { rules ->
             blockedPackages = rules.blockedApps
             dailyLimitMinutes = rules.dailyLimitMinutes
@@ -83,8 +101,25 @@ class AppMonitorAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Ba mẹ đã xoá máy này trên dashboard: quên ghép nối và bỏ mọi giới hạn —
+     * máy không còn được quản lý nữa thì không được chặn bé dùng máy.
+     */
+    private fun onDeviceRemoved() {
+        // MainActivity cũng nghe việc này và có thể đã xoá ghép nối trước rồi.
+        PairingPrefs.clearPairing(this)
+        listeningFor = null
+        blockedPackages = emptySet()
+        dailyLimitMinutes = Int.MAX_VALUE
+        bonusMinutesToday = 0
+        appLimits = emptyMap()
+        locationEnabled = false
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
+        if (!PairingPrefs.isPaired(this)) return // chưa ghép nối / đã bị xoá: không theo dõi, không chặn
+        startListeningIfPaired()
         if (packageName == this.packageName) {
             lastOwnAppForegroundTime = System.currentTimeMillis() // để bé luôn mở được Sổ Bé Ngoan
             return // đừng tự chặn chính mình
