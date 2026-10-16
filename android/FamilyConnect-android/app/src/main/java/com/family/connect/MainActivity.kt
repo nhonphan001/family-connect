@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity() {
         // vẽ lại ngay để không phải mở lại app mới thấy giờ được đếm.
         if (::binding.isInitialized) {
             updateUsagePermissionWarning()
+            updateAccessibilityWarning()
             renderUsage(lastEffectiveLimit)
         }
     }
@@ -159,8 +160,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Mọi thứ dashboard thấy (online, thông tin máy, giờ dùng, app đang mở) đều
+     * do AppMonitorAccessibilityService gửi lên. Chưa bật Trợ năng thì máy vẫn
+     * đọc được lịch, tin nhắn, giờ giới hạn... nhưng dashboard không thấy gì —
+     * nên phải báo rõ trên màn hình thay vì chỉ mở Cài đặt rồi thôi.
+     */
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = ComponentName(this, AppMonitorAccessibilityService::class.java)
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        return enabled.split(':').any { ComponentName.unflattenFromString(it) == expected }
+    }
+
     private fun promptAccessibilityIfNeeded() {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        updateAccessibilityWarning()
+        binding.accessibilityWarning.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        if (!isAccessibilityServiceEnabled()) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    private fun updateAccessibilityWarning() {
+        binding.accessibilityWarning.visibility =
+            if (isAccessibilityServiceEnabled()) android.view.View.GONE else android.view.View.VISIBLE
     }
 
     private fun requestLocationPermissionIfNeeded() {

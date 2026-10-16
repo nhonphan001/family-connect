@@ -45,6 +45,17 @@
             android:text="⚠️ Chưa đếm được giờ dùng máy — bấm vào đây để bật quyền &quot;Usage Access&quot; cho Sổ Bé Ngoan"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/accessibilityWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="12dp"
+            android:background="@android:color/white"
+            android:textColor="@color/brand_coral"
+            android:text="⚠️ Ba mẹ chưa thấy được máy này — bấm vào đây, chọn &quot;Sổ Bé Ngoan&quot; trong Trợ năng và bật lên. Nếu nút bật bị mờ: vào Cài đặt › Ứng dụng › Sổ Bé Ngoan › ⋮ › &quot;Cho phép cài đặt bị hạn chế&quot; rồi thử lại."
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/requestExtensionButton"
             android:layout_width="wrap_content"

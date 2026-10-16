@@ -1062,50 +1062,51 @@ document.getElementById("scheduleTitleInput").addEventListener("keydown", e => {
 document.getElementById("requestScreenshotBtn").addEventListener("click", requestScreenshot);
 
 // ---------- Tự phát hiện danh sách bé từ Firebase (không còn cố định nữa) ----------
+// Danh sách thiết bị đã Từ chối lưu ở users/{uid}/rejectedDevices của phụ
+// huynh — nơi phụ huynh vừa ĐỌC vừa GHI được. Trước đây lưu ở
+// families/{id}/meta/rejectedDeviceUids: ghi được nhưng node "meta" KHÔNG có
+// luật .read, nên lúc F5 đọc lại bị chặn và các dòng đã Từ chối hiện lại.
+function rejectedDevicesPath(deviceUid) {
+  const session = getSession();
+  if (!session || !session.uid) return null;
+  return `users/${session.uid}/rejectedDevices${deviceUid ? "/" + deviceUid : ""}`;
+}
+
 async function fetchPendingDevices() {
   try {
-    const [data, approvedData, metaData] = await Promise.all([
+    const rejectedPath = rejectedDevicesPath();
+    const [data, rejectedData] = await Promise.all([
       fbGet(`families/${FAMILY_ID}/pendingDevices`),
-      fbGet(`families/${FAMILY_ID}/approvedDevices`).catch(() => null),
-      fbGet(`families/${FAMILY_ID}/meta`).catch(() => null)
+      rejectedPath
+        ? fbGet(rejectedPath).catch(e => { console.error("Tải rejectedDevices thất bại:", e); return null; })
+        : Promise.resolve(null)
     ]);
-    // Thiết bị nào đã có trong approvedDevices trên Firebase (tức đã Duyệt
-    // thành công thật sự) thì luôn ẩn khỏi hàng chờ — không chỉ dựa vào
-    // approvedDeviceUids của phiên làm việc này (biến đó mất khi tải lại
-    // trang). Đây là nguyên nhân dòng "Duyệt" cứ hiện lại sau khi F5: lệnh
-    // xoá pendingDevices bị luật bảo mật Firebase chặn nên node cũ vẫn còn
-    // nằm trên Firebase mãi, và mỗi lần tải lại trang thì nó lại xuất hiện.
-    const approvedUids = new Set([
-      ...approvedDeviceUids,
-      ...(approvedData ? Object.keys(approvedData) : [])
-    ]);
-    // Tương tự cho "Từ chối": luật bảo mật Firebase KHÔNG cho phép phụ huynh
-    // xoá pendingDevices/{deviceUid} của thiết bị khác (chỉ chính thiết bị đó
-    // mới xoá được), nên dùng danh sách rejectedDeviceUids lưu trong
-    // families/{id}/meta/rejectedDeviceUids (nơi phụ huynh CÓ quyền ghi) để
-    // ẩn vĩnh viễn, không phụ thuộc việc xoá pendingDevices có thành công hay không.
-    const rejectedUids = new Set([
-      ...rejectedDeviceUids,
-      ...(metaData && metaData.rejectedDeviceUids ? Object.keys(metaData.rejectedDeviceUids) : [])
-    ]);
+    Object.keys(rejectedData || {}).forEach(uid => rejectedDeviceUids.add(uid));
+
+    // Luật bảo mật chỉ cho phụ huynh đọc TỪNG approvedDevices/{deviceUid}, không
+    // đọc được cả node approvedDevices (không có .read ở cấp đó) — trước đây
+    // đọc cả node bị chặn âm thầm, nên sau khi F5 các dòng đã Duyệt hiện lại.
+    // Giờ hỏi riêng từng thiết bị đang chờ; đã biết là duyệt rồi thì nhớ vào
+    // approvedDeviceUids để lần làm mới sau (mỗi 5 giây) không hỏi lại nữa.
+    const unknown = Object.keys(data || {})
+      .filter(uid => !approvedDeviceUids.has(uid) && !rejectedDeviceUids.has(uid));
+    const approvals = await Promise.all(unknown.map(uid =>
+      fbGet(`families/${FAMILY_ID}/approvedDevices/${uid}`).catch(e => {
+        console.error(`Kiểm tra approvedDevices/${uid} thất bại:`, e);
+        return null;
+      })
+    ));
+    unknown.forEach((uid, i) => { if (approvals[i] && approvals[i].childId) approvedDeviceUids.add(uid); });
+
     pendingDevices = data
       ? Object.entries(data)
-          .filter(([deviceUid]) => !approvedUids.has(deviceUid) && !rejectedUids.has(deviceUid))
+          .filter(([deviceUid]) => !approvedDeviceUids.has(deviceUid) && !rejectedDeviceUids.has(deviceUid))
           .map(([deviceUid, v]) => ({
             deviceUid, childName: v.childName, childGrade: v.childGrade, requestedAt: v.requestedAt
           }))
       : [];
-    // Dọn rác âm thầm: đã xác nhận là đã duyệt/từ chối rồi thì thử xoá lại node
-    // pendingDevices thừa trên Firebase (không quan trọng nếu vẫn thất bại
-    // do luật bảo mật — dashboard đã tự lọc bằng approvedUids/rejectedUids ở trên rồi).
-    if (data) {
-      for (const deviceUid of Object.keys(data)) {
-        if (approvedUids.has(deviceUid) || rejectedUids.has(deviceUid)) {
-          fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`).catch(() => {});
-        }
-      }
-    }
   } catch (e) {
+    console.error("Tải pendingDevices thất bại:", e);
     pendingDevices = [];
   }
 }
@@ -1157,27 +1158,20 @@ async function rejectDevice(deviceUid) {
   pendingDevices = pendingDevices.filter(d => d.deviceUid !== deviceUid);
   render();
 
-  // Luật bảo mật Firebase CHỈ cho phép chính thiết bị đó xoá
-  // pendingDevices/{deviceUid} của nó — phụ huynh (chủ hộ) không có quyền
-  // xoá node của thiết bị khác, nên lệnh fbDelete trước đây luôn thất bại và
-  // hiện lỗi "Không từ chối được yêu cầu". Thay vào đó, ghi deviceUid vào
-  // families/{id}/meta/rejectedDeviceUids/{deviceUid} — nơi phụ huynh CÓ
-  // quyền ghi (kế thừa quyền ghi của node "meta") — để ẩn vĩnh viễn, không
-  // phụ thuộc việc xoá pendingDevices có thành công hay không.
+  // Phụ huynh không xoá được pendingDevices/{deviceUid} của thiết bị khác
+  // (luật bảo mật), nên ghi lại thiết bị đã Từ chối vào chỗ của chính phụ
+  // huynh (xem rejectedDevicesPath) để ẩn vĩnh viễn kể cả sau khi F5.
+  const path = rejectedDevicesPath(deviceUid);
   try {
-    await fbPut(`families/${FAMILY_ID}/meta/rejectedDeviceUids/${deviceUid}`, true);
+    if (!path) throw new Error("Thiếu uid phụ huynh trong phiên đăng nhập");
+    await fbPut(path, { rejectedAt: { ".sv": "timestamp" } });
   } catch (e) {
-    console.error("Ghi rejectedDeviceUids thất bại:", e);
+    console.error("Ghi rejectedDevices thất bại:", e);
     showError("Không từ chối được yêu cầu — kiểm tra kết nối Firebase.");
     rejectedDeviceUids.delete(deviceUid);
     await fetchPendingDevices();
     render();
-    return;
   }
-
-  // Dọn rác âm thầm: thử xoá luôn node pendingDevices thừa (thường sẽ thất
-  // bại do luật bảo mật, không sao — dòng đã bị ẩn vĩnh viễn ở trên rồi).
-  fbDelete(`families/${FAMILY_ID}/pendingDevices/${deviceUid}`).catch(() => {});
 }
 
 async function discoverChildren() {
