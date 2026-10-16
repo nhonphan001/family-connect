@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_vertical"
+    android:background="@color/brand_bg">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kết nối với gia đình"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/brand_navy" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="24dp"
+        android:text="Nhập Mã gia đình mà ba mẹ đã tạo trên dashboard"
+        android:textColor="@color/brand_navy" />
+
+    <EditText
+        android:id="@+id/familyCodeInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Mã gia đình (vd: 8F3K2X)"
+        android:inputType="textCapCharacters" />
+
+    <EditText
+        android:id="@+id/childNameInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="Tên bé (vd: Bình)" />
+
+    <EditText
+        android:id="@+id/childGradeInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="Lớp (vd: Lớp 5) — không bắt buộc" />
+
+    <TextView
+        android:id="@+id/errorText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textColor="@color/brand_coral"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/connectButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Kết nối" />
+
+    <TextView
+        android:id="@+id/waitingText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:textColor="@color/brand_teal"
+        android:gravity="center"
+        android:visibility="gone" />
+
+</LinearLayout>

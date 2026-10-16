@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "406899862940",
+    "firebase_url": "https://so-be-ngoan-v2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "so-be-ngoan-v2",
+    "storage_bucket": "so-be-ngoan-v2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406899862940:android:92ed6e67d1e19e81bdec59",
+        "android_client_info": {
+          "package_name": "com.family.connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0gfp6Q8WQ-V_T_FrPD6GuIORpwUJPSLY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

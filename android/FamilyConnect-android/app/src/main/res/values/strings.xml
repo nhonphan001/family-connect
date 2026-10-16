@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Sổ Bé Ngoan</string>
+    <string name="accessibility_service_description">Sổ Bé Ngoan dùng dịch vụ này để nhận biết ứng dụng nào đang mở (áp dụng giới hạn giờ ba mẹ đã đặt) và để chụp ảnh màn hình khi ba mẹ chủ động yêu cầu từ dashboard. Ứng dụng không tự động đọc hay ghi lại nội dung màn hình ngoài các lần chụp này.</string>
+    <string name="device_admin_explanation">Cho phép Sổ Bé Ngoan khoá màn hình khi hết giờ sử dụng trong ngày mà ba mẹ đã đặt.</string>
+    <string name="reward_points_format">Điểm thưởng: %1$d</string>
+</resources>
